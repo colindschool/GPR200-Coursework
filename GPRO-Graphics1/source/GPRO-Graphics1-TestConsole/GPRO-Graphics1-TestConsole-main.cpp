@@ -18,8 +18,8 @@
 	GPRO-Graphics1-TestConsole-main.c/.cpp
 	Main entry point source file for a Windows console application.
 
-	Modified by: ____________
-	Modified because: ____________
+	Modified by: Colin Deane
+	Modified because: Completing the Graphics 1 Lab
 */
 
 
@@ -52,11 +52,44 @@ void testVector()
 #endif	// __cplusplus
 }
 
+#include <iostream>
 
 int main(int const argc, char const* const argv[])
 {
-	testVector();
+	//testVector();
 
-	printf("\n\n");
+	//printf("\n\n");
+
+	// Image 
+
+	const int image_width = 256;
+	const int image_height = 256;
+
+	// Render
+
+	std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+
+	// Use this loop to create RBG values for individual pixels going from left-to-right and top-to-bottom
+	// ir will always be 0 at the far left and 255 at the far right 
+	// ig will always be 255 at the top and 0 at the bottom
+	// ib will always be 63 (it is not affected by the loop)
+	for (int j = image_height - 1; j >= 0; --j)
+	{
+		std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush; //Report the progress
+		for (int i = 0; i < image_width; ++i)
+		{
+			float r = float(i) / (image_width - 1);
+			float g = float(j) / (image_height - 1);
+			float b = 0.25;
+
+			int ir = static_cast<int>(255.999 * r);
+			int ig = static_cast<int>(255.999 * g);
+			int ib = static_cast<int>(255.999 * b);
+
+			std::cout << ir << ' ' << ig << ' ' << ib << '\n';
+		}
+	}
+
+	std::cerr << "\nDone.\n";
 	system("pause");
 }
