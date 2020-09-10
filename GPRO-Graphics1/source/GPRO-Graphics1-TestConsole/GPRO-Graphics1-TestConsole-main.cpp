@@ -28,6 +28,7 @@
 
 
 #include "gpro/gpro-math/gproVector.h"
+#include "gpro/color.h"
 
 
 void testVector()
@@ -69,16 +70,22 @@ int main(int const argc, char const* const argv[])
 
 	std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
-	// Use this loop to create RBG values for individual pixels going from left-to-right and top-to-bottom
-	// ir will always be 0 at the far left and 255 at the far right 
-	// ig will always be 255 at the top and 0 at the bottom
-	// ib will always be 63 (it is not affected by the loop)
+	// Use this loop to create RGB values for individual pixels going from left-to-right and top-to-bottom
+	// R will always be 0 at the far left and 255 at the far right 
+	// G will always be 255 at the top and 0 at the bottom
+	// B will always be 63 (it is not affected by the loop)
 	for (int j = image_height - 1; j >= 0; --j)
 	{
 		std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush; //Report the progress
 		for (int i = 0; i < image_width; ++i)
 		{
-			float r = float(i) / (image_width - 1);
+			// Create a color for each pixel. The first input is R, the second input is G, the third input is B 
+			color pixel_color(float(i) / (image_width - 1), float(j) / (image_height - 1), 0.25);
+			write_color(std::cout, pixel_color);
+			
+			// The code below is equivalent to the code above
+			
+			/*float r = float(i) / (image_width - 1);
 			float g = float(j) / (image_height - 1);
 			float b = 0.25;
 
@@ -86,7 +93,7 @@ int main(int const argc, char const* const argv[])
 			int ig = static_cast<int>(255.999 * g);
 			int ib = static_cast<int>(255.999 * b);
 
-			std::cout << ir << ' ' << ig << ' ' << ib << '\n';
+			std::cout << ir << ' ' << ig << ' ' << ib << '\n'; */
 		}
 	}
 

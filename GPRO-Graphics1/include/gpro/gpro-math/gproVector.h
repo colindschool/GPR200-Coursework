@@ -18,8 +18,8 @@
 	gproVector.h
 	Interface for vectors. Sets an example for C and C++ compatible headers.
 
-	Modified by: ____________
-	Modified because: ____________
+	Modified by: Colin Deane
+	Modified because: Implementing more vector functionality
 */
 
 #ifndef _GPRO_VECTOR_H_
@@ -74,10 +74,17 @@ union vec3
 
 	vec3& operator +=(vec3 const& rh);	// addition assignment operator (add other to this)
 
+	vec3& operator *=(const float t);	// multiplication operator (multiply this by other)
+
 	vec3 const operator +(vec3 const& rh) const;	// addition operator (get sum of this and another)
 
 #endif	// __cplusplus
 };
+
+// Declare type aliases for vec3
+using point3 = vec3;	// 3D point
+using color = vec3;		// RBG color
+
 
 
 // DB: declare C functions (all equivalents of above C++ functions are here)

@@ -18,8 +18,8 @@
 	gproVector.h
 	Interface for vectors. Sets an example for C and C++ compatible headers.
 
-	Modified by: ____________
-	Modified because: ____________
+	Modified by: Colin Deane
+	Modified because: Implementing more vector utility functions
 */
 
 #ifdef _GPRO_VECTOR_H_
@@ -59,6 +59,14 @@ inline vec3& vec3::operator +=(vec3 const& rh)
 	x += rh.x;
 	y += rh.y;
 	z += rh.z;
+	return *this;
+}
+
+inline vec3& vec3::operator *=(const float t)
+{
+	x *= t;
+	y *= t;
+	z *= t;
 	return *this;
 }
 
