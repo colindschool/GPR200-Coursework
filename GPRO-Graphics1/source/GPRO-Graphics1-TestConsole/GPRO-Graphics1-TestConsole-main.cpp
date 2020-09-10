@@ -75,6 +75,7 @@ int main(int const argc, char const* const argv[])
 	// ib will always be 63 (it is not affected by the loop)
 	for (int j = image_height - 1; j >= 0; --j)
 	{
+		std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush; //Report the progress
 		for (int i = 0; i < image_width; ++i)
 		{
 			float r = float(i) / (image_width - 1);
@@ -89,5 +90,6 @@ int main(int const argc, char const* const argv[])
 		}
 	}
 
+	std::cerr << "\nDone.\n";
 	system("pause");
 }
