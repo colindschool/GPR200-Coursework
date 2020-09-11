@@ -160,7 +160,11 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\include\gpro\color.h" />
     <ClInclude Include="..\..\..\include\gpro\gpro-math\gproVector.h" />
+    <ClInclude Include="..\..\..\include\gpro\hittable.h" />
+    <ClInclude Include="..\..\..\include\gpro\hittable_list.h" />
+    <ClInclude Include="..\..\..\include\gpro\mathconstants.h" />
     <ClInclude Include="..\..\..\include\gpro\ray.h" />
+    <ClInclude Include="..\..\..\include\gpro\sphere.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\include\gpro\gpro-math\_inl\gproVector.inl" />
