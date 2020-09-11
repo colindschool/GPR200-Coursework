@@ -56,22 +56,35 @@ void testVector()
 
 #include <iostream>
 
-bool hit_sphere(const point3& center, float radius, const ray& r)
+float hit_sphere(const point3& center, float radius, const ray& r)
 {
 	vec3 oc = r.origin() - center;
-	float a = dot(r.direction(), r.direction());
-	float b = 2.0f * dot(oc, r.direction());
-	float c = dot(oc, oc) - (radius * radius);
-	float discriminant = b * b - 4 * a * c;
-	return (discriminant > 0);
+	float a = r.direction().length_squared();
+	float half_b = dot(oc, r.direction());
+	float c = oc.length() - radius*radius;
+	float discriminant = half_b * half_b - a * c;
+	
+	if (discriminant < 0)
+	{
+		return -1.0;
+	}
+	else 
+	{
+		return (-half_b - float(sqrt(discriminant)) / a);
+	}
+
 }
 
 color ray_color(const ray& r)
 {
-	if (hit_sphere(point3(0, 0, -1), 0.5, r))
-		return color(1, 0, 0);
+	float t = hit_sphere(point3(0, 0, -1), 0.5, r);
+	if (t > 0.0)
+	{
+		vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
+		return color(N.x + 1, N.y + 1, N.z + 1) * 0.5;
+	}
 	vec3 unit_direction = unit_vector(r.direction());
-	float t = 0.5f * (1.0f + unit_direction.y);
+	t = 0.5f * (1.0f + unit_direction.y);
 	return (color(1.0f,1.0f,1.0f) * (1 - t) + color(0.5f, 0.7f, 1.0f) * t);
 	
 }
