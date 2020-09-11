@@ -113,6 +113,8 @@ floatv vec3sum(float3 v_sum, float3 const v_lh, float3 const v_rh);	// get sum o
 // DB: end C linkage for C++ symbols
 }
 
+float dot(const vec3& u, const vec3& v);
+
 vec3 unit_vector(vec3 const& rh);
 
 #endif	// __cplusplus

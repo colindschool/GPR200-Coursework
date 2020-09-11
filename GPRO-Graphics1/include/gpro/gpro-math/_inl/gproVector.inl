@@ -142,6 +142,11 @@ inline vec3 unit_vector(const vec3& rh)
 	return rh / rh.length();
 }
 
+inline float dot(const vec3& u, const vec3& v)
+{
+	return ((u.x * v.x) + (u.y * v.y) + (u.z * v.z));
+}
+
 
 #endif	// !_GPRO_VECTOR_INL_
 #endif	// _GPRO_VECTOR_H_
