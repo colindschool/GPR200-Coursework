@@ -62,12 +62,17 @@ inline vec3& vec3::operator +=(vec3 const& rh)
 	return *this;
 }
 
-inline vec3& vec3::operator *=(const float t)
+inline vec3& vec3::operator *=(float const t)
 {
 	x *= t;
 	y *= t;
 	z *= t;
 	return *this;
+}
+
+inline vec3 const vec3::operator *(float const t) const
+{
+	return vec3((x * t), (y * t), (z * t));
 }
 
 inline vec3 const vec3::operator +(vec3 const& rh) const

@@ -76,6 +76,8 @@ union vec3
 
 	vec3& operator *=(const float t);	// multiplication operator (multiply this by other)
 
+	vec3 const operator *(float t) const;	// multiplication operator (multiply this by other and return a new vec3)
+
 	vec3 const operator +(vec3 const& rh) const;	// addition operator (get sum of this and another)
 
 #endif	// __cplusplus
