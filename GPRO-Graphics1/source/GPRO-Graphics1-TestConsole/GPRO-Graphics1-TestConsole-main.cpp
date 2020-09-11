@@ -19,7 +19,10 @@
 	Main entry point source file for a Windows console application.
 
 	Modified by: Colin Deane
-	Modified because: Completing the Graphics 1 Lab
+	Modified because: Completing the Graphics 1 Lab. Displays two spheres with a gradient background
+
+	Contains code that is an edited version of Peter Shirley's Ray Tracing in One Weekend. Available at: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+	Special thanks to Dan Bucketin for providing the framework for the vectors
 */
 
 
@@ -27,9 +30,10 @@
 #include <stdlib.h>
 
 
-#include "gpro/gpro-math/gproVector.h"
+#include "gpro/mathconstants.h" //Also includes other common headers (e.g. ray.h and gproVector.h)
+#include "gpro/hittable_list.h"
 #include "gpro/color.h"
-#include "gpro/ray.h"
+#include "gpro/sphere.h"
 
 
 void testVector()
@@ -56,47 +60,47 @@ void testVector()
 
 #include <iostream>
 
-float hit_sphere(const point3& center, float radius, const ray& r)
-{
-	
 
-}
-
-color ray_color(const ray& r)
+// Gets the color of the ray based on any collisions
+color ray_color(const ray& r, const Hittable& world)
 {
-	float t = hit_sphere(point3(0, 0, -1), 0.5, r);
-	if (t > 0.0)
+	//Creates a hit_record to store the hit
+	hit_record rec;
+	if (world.hit(r, 0, infinity, rec)) // If there is a collision
 	{
-		vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
-		return color(N.x + 1, N.y + 1, N.z + 1) * 0.5;
+		// Get the normal and white to it then multiply by half
+		return (rec.normal + color(1, 1, 1)) * 0.5f;
 	}
+	//Create the gradient in the background
 	vec3 unit_direction = unit_vector(r.direction());
-	t = 0.5f * (1.0f + unit_direction.y);
-	return (color(1.0f,1.0f,1.0f) * (1 - t) + color(0.5f, 0.7f, 1.0f) * t);
+	float t = (unit_direction.y + 1.0f) * 0.5f;
+	return (color(1.0f, 1.0f, 1.0f) * (1.0f - t) + (color(0.5f, 0.7f, 1.0f) * t));
+	
 	
 }
 
 int main(int const argc, char const* const argv[])
 {
-	//testVector();
-
-	//printf("\n\n");
-
 	// Image 
 
-	const float aspect_ratio = 16.0f / 9.0f;
+	const float aspect_ratio = 16.0f / 9.0f; // 16:9 aspect ratio
 	const int image_width = 400;
-	const int image_height = static_cast<int>(image_width / aspect_ratio);
+	const int image_height = static_cast<int>(image_width / aspect_ratio); //Maintains aspect ratio
+
+	// World
+	Hittable_list world;
+	world.add(make_shared<Sphere>(point3(0, 0, -1), 0.5f));			// Create a small sphere at the center of the viewport with a radius of .5
+	world.add(make_shared<Sphere>(point3(0, -100.5, -1), 100.0f));	// Create a large sphere super far outside the viewport (-100 y) with a radius of 100
 
 	// Camera
 	float viewport_height = 2.0;
 	float viewport_width = aspect_ratio * viewport_height;
-	float focal_length = 1.0;
+	float focal_length = 1.0; //Distance between the project plane and the projection point
 	
-	point3 origin = point3(0, 0, 0);
-	vec3 horizontal = vec3(viewport_width, 0, 0);
-	vec3 vertical = vec3(0, viewport_height, 0);
-	point3 lower_left_corner = origin - (horizontal / 2) - (vertical / 2) - vec3(0, 0, focal_length);
+	point3 origin = point3(0, 0, 0);					// Origin of the camera
+	vec3 horizontal = vec3(viewport_width, 0, 0);		// Vector for tracking horizontal movement
+	vec3 vertical = vec3(0, viewport_height, 0);		// Vector for tracking vertical movement
+	point3 lower_left_corner = origin - (horizontal / 2) - (vertical / 2) - vec3(0, 0, focal_length); // Calculate the lower left corner of the image
 
 	// Render
 
@@ -111,12 +115,13 @@ int main(int const argc, char const* const argv[])
 		std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush; //Report the progress
 		for (int i = 0; i < image_width; ++i)
 		{
-			float u = float(i) / (image_width - 1);
-			float v = float(j) / (image_height - 1);
-			ray r(origin, lower_left_corner + (horizontal * u) + (vertical * v) - origin);
-			color pixel_color = ray_color(r);
-			write_color(std::cout, pixel_color);
+			float u = float(i) / (image_width - 1);									// 'u' will vary from 0 to 1
+			float v = float(j) / (image_height - 1);								// 'v' will vary from 0 to 1
+			ray r(origin, lower_left_corner + (horizontal * u) + (vertical * v));	// Create a ray that has its origin at the camera origin and it's direction based from the lower left corner
+			color pixel_color = ray_color(r, world);								// Color the pixel based on the calculated ray color
+			write_color(std::cout, pixel_color);									// Write the color to the screen
 
+			/*OLDER ITERATIONS
 
 			// Create a color for each pixel. The first input is R, the second input is G, the third input is B 
 			//color pixel_color(float(i) / (image_width - 1), float(j) / (image_height - 1), 0.25);
@@ -124,7 +129,7 @@ int main(int const argc, char const* const argv[])
 			
 			// The code below is equivalent to the code above
 			
-			/*float r = float(i) / (image_width - 1);
+			float r = float(i) / (image_width - 1);
 			float g = float(j) / (image_height - 1);
 			float b = 0.25;
 
@@ -133,6 +138,7 @@ int main(int const argc, char const* const argv[])
 			int ib = static_cast<int>(255.999 * b);
 
 			std::cout << ir << ' ' << ig << ' ' << ib << '\n'; */
+			
 		}
 	}
 

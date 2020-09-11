@@ -20,6 +20,9 @@
 
 	Modified by: Colin Deane
 	Modified because: Implementing more vector functionality
+
+	Contains code that is an edited version of Peter Shirley's Ray Tracing in One Weekend. Available at: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+	Special thanks to Dan Bucketin for providing the framework for the vectors
 */
 
 #ifndef _GPRO_VECTOR_H_
@@ -70,9 +73,9 @@ union vec3
 	explicit vec3(float3 const vc);	// copy ctor w generic array of floats
 	vec3(vec3 const& rh);	// copy ctor
 
-	float length() const;
+	float length() const;	// gets the length of the vector
 
-	float length_squared() const;
+	float length_squared() const;	// gets the squared length of the vector
 
 	vec3& operator =(vec3 const& rh);	// assignment operator (copy other to this)
 
@@ -113,9 +116,9 @@ floatv vec3sum(float3 v_sum, float3 const v_lh, float3 const v_rh);	// get sum o
 // DB: end C linkage for C++ symbols
 }
 
-float dot(const vec3& u, const vec3& v);
+float dot(const vec3& u, const vec3& v);	// Calculates the dot product of two vectors
 
-vec3 unit_vector(vec3 const& rh);
+vec3 unit_vector(vec3 const& rh);			// Calculates the unit vector
 
 #endif	// __cplusplus
 
