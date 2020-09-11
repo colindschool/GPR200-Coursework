@@ -160,6 +160,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\include\gpro\color.h" />
     <ClInclude Include="..\..\..\include\gpro\gpro-math\gproVector.h" />
+    <ClInclude Include="..\..\..\include\gpro\ray.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\include\gpro\gpro-math\_inl\gproVector.inl" />

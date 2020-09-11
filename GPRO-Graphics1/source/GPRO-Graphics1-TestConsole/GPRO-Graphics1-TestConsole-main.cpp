@@ -29,6 +29,7 @@
 
 #include "gpro/gpro-math/gproVector.h"
 #include "gpro/color.h"
+#include "gpro/ray.h"
 
 
 void testVector()
@@ -55,6 +56,14 @@ void testVector()
 
 #include <iostream>
 
+color ray_color(const ray& r)
+{
+	vec3 unit_direction = unit_vector(r.direction());
+	float t = 0.5f * (1.0f + unit_direction.y);
+	return (color(1.0f,1.0f,1.0f) * (1 - t) + color(0.5f, 0.7f, 1.0f) * t);
+	
+}
+
 int main(int const argc, char const* const argv[])
 {
 	//testVector();
@@ -63,8 +72,19 @@ int main(int const argc, char const* const argv[])
 
 	// Image 
 
+	const float aspect_ratio = 16.0f / 9.0f;
 	const int image_width = 256;
 	const int image_height = 256;
+
+	// Camera
+	float viewport_height = 2.0;
+	float viewport_width = aspect_ratio * viewport_height;
+	float focal_length = 1.0;
+	
+	point3 origin = point3(0, 0, 0);
+	vec3 horizontal = vec3(viewport_width, 0, 0);
+	vec3 vertical = vec3(0, viewport_height, 0);
+	point3 lower_left_corner = origin - (horizontal / 2) - (vertical / 2) - vec3(0, 0, focal_length);
 
 	// Render
 
@@ -79,9 +99,16 @@ int main(int const argc, char const* const argv[])
 		std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush; //Report the progress
 		for (int i = 0; i < image_width; ++i)
 		{
-			// Create a color for each pixel. The first input is R, the second input is G, the third input is B 
-			color pixel_color(float(i) / (image_width - 1), float(j) / (image_height - 1), 0.25);
+			float u = float(i) / (image_width - 1);
+			float v = float(j) / (image_height - 1);
+			ray r(origin, lower_left_corner + (horizontal * u) + (vertical * v) - origin);
+			color pixel_color = ray_color(r);
 			write_color(std::cout, pixel_color);
+
+
+			// Create a color for each pixel. The first input is R, the second input is G, the third input is B 
+			//color pixel_color(float(i) / (image_width - 1), float(j) / (image_height - 1), 0.25);
+			//write_color(std::cout, pixel_color);
 			
 			// The code below is equivalent to the code above
 			

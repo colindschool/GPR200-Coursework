@@ -70,15 +70,23 @@ union vec3
 	explicit vec3(float3 const vc);	// copy ctor w generic array of floats
 	vec3(vec3 const& rh);	// copy ctor
 
+	float length() const;
+
+	float length_squared() const;
+
 	vec3& operator =(vec3 const& rh);	// assignment operator (copy other to this)
 
 	vec3& operator +=(vec3 const& rh);	// addition assignment operator (add other to this)
 
-	vec3& operator *=(const float t);	// multiplication operator (multiply this by other)
+	vec3& operator *=(const float rh);	// multiplication operator (multiply this by other)
 
-	vec3 const operator *(float t) const;	// multiplication operator (multiply this by other and return a new vec3)
+	vec3 const operator *(float rh) const;			// multiplication operator (multiply this by other and return a new vec3)
 
 	vec3 const operator +(vec3 const& rh) const;	// addition operator (get sum of this and another)
+
+	vec3 const operator /(float rh) const;			// division operator (divide each element by a float rh)
+
+	vec3 const operator -(vec3 const& rh) const;	// subtraction operator (subtract a vector and return a new vector)
 
 #endif	// __cplusplus
 };
@@ -104,6 +112,9 @@ floatv vec3sum(float3 v_sum, float3 const v_lh, float3 const v_rh);	// get sum o
 #ifdef __cplusplus
 // DB: end C linkage for C++ symbols
 }
+
+vec3 unit_vector(vec3 const& rh);
+
 #endif	// __cplusplus
 
 

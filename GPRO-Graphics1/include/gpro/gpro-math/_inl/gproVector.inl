@@ -28,6 +28,7 @@
 
 
 #ifdef __cplusplus
+#include <math.h>
 
 inline vec3::vec3()
 	: x(0.0f), y(0.0f), z(0.0f)
@@ -46,6 +47,16 @@ inline vec3::vec3(vec3 const& rh)
 {
 }
 
+inline float vec3::length() const
+{
+	return float(sqrt(length_squared()));
+}
+
+inline float vec3::length_squared() const
+{
+	return ((x * x) + (y * y) + (z * z));
+}
+
 inline vec3& vec3::operator =(vec3 const& rh)
 {
 	x = rh.x;
@@ -62,22 +73,32 @@ inline vec3& vec3::operator +=(vec3 const& rh)
 	return *this;
 }
 
-inline vec3& vec3::operator *=(float const t)
+inline vec3& vec3::operator *=(float const rh)
 {
-	x *= t;
-	y *= t;
-	z *= t;
+	x *= rh;
+	y *= rh;
+	z *= rh;
 	return *this;
 }
 
-inline vec3 const vec3::operator *(float const t) const
+inline vec3 const vec3::operator *(float const rh) const
 {
-	return vec3((x * t), (y * t), (z * t));
+	return vec3((x * rh), (y * rh), (z * rh));
 }
 
 inline vec3 const vec3::operator +(vec3 const& rh) const
 {
 	return vec3((x + rh.x), (y + rh.y), (z + rh.z));
+}
+
+inline vec3 const vec3::operator /(float rh) const
+{
+	return vec3((x / rh), (y / rh), (z / rh));
+}
+
+inline vec3 const vec3::operator -(vec3 const& rh) const
+{
+	return vec3((x - rh.x), (y - rh.y), (z - rh.z));
 }
 
 #endif	// __cplusplus
@@ -114,6 +135,11 @@ inline floatv vec3add(float3 v_lh_sum, float3 const v_rh)
 inline floatv vec3sum(float3 v_sum, float3 const v_lh, float3 const v_rh)
 {
 	return vec3init(v_sum, (v_lh[0] + v_rh[0]), (v_lh[1] + v_rh[1]), (v_lh[2] + v_rh[2]));
+}
+
+inline vec3 unit_vector(const vec3& rh)
+{
+	return rh / rh.length();
 }
 
 
