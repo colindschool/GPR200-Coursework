@@ -1,3 +1,24 @@
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: Image
+//	 Purpose: Contains a multitude of effects that are coded for use in ShaderToy
+//
+//	 Contributors:
+//	 Daniel Buckstein - Provided a lot of the framework for the gradient effect
+//	 Peter Shirley - Provided the formula for calculating if a point is in a circle.
+//		Formula taken from his Raytracing in One Weekend book: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+//	 Shadertoy - the base for the color changing functionality
+
 #define colorRGB	vec3
 #define colorRGBA	vec4
 
@@ -96,22 +117,70 @@ vec4 changingCircle(in vec2 fragCoord, in float time, in vec2 resolution)
     return vec4(color, 1.0);
 }
 
-vec4 crazyEffect(in vec2 fragCoord)
+// Has a space background that changes color and circles that move across the screen
+vec4 crazyEffect(in vec2 fragCoord, in vec2 resolution, in float time, in sampler2D backgroundTexture)
 {
-	return vec4(1.0);
+    
+    vec2 uv = fragCoord / resolution;
+    // Create a base color based on the texture in the background
+    colorRGB baseColor = 0.5* cos(time+uv.xyy + vec3(1, 3, 2)); // Changing color based on Shadertoy base code
+    baseColor *= vec3(texture(backgroundTexture, uv));
+    
+    // Create an orange circle that goes around the entire screen
+    float radius = 50.0 + 25.0 * cos(time);
+    vec2 circle1;
+    circle1.x = fragCoord.x - (cos(time) * (resolution.x / 4.0) + (resolution.x / 2.0));
+    circle1.y = fragCoord.y - (sin(time) * (resolution.y / 3.0) + (resolution.y / 2.0));
+    
+    // This circle will be orange
+    if(pow(circle1.x, 2.0) + pow(circle1.y, 2.0) <= pow(radius, 2.0))
+    {
+     	baseColor = vec3(1.0, 0.5, 0.0);   
+    }
+    
+    // Create the second circle that goes across the screen horizontally
+    radius = 100.0;
+    vec2 circle2;
+    circle2.x = fragCoord.x - (cos(iTime) * (resolution.x / 4.0) + (resolution.x / 2.0));
+    circle2.y = fragCoord.y - (resolution.y / 2.0);
+    
+    // This circle will inverse the color of whatever is there
+    if(pow(circle2.x, 2.0) + pow(circle2.y, 2.0) <= pow(radius, 2.0))
+    {
+        baseColor = vec3(1.0 - baseColor.r, 1.0 - baseColor.g, 1.0 - baseColor.b);
+    }
+    
+    // Create the third circle that goes across the screen vertically
+    radius = 45.0;
+    vec2 circle3;
+    circle3.x = fragCoord.x - resolution.x / 2.;
+    circle3.y = fragCoord.y - (sin(time) * (resolution.y / 3.0) + (resolution.y / 2.0));
+    
+    if(pow(circle3.x, 2.0) + pow(circle3.y, 2.0) <= pow(radius, 2.0))
+    {
+        // Splits the circle in half
+        if(mod(circle3.x, 2.0) > circle3.x / 2.0)
+        {
+        baseColor = 1.0 *sin(time + uv.xyx + vec3(0, 4, 6)); // Changing color based on Shadertoy base code
+        }
+        else
+        {
+         baseColor = 1.0 * cos(time + uv.xxy+ vec3(8, 1, 3)); // Changing color based on Shadertoy base code
+        }
+    }
+    
+	return vec4(baseColor, 1.0);
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
+    
+    
+    fragColor = gradient(fragCoord, iResolution.xy);
+    
     //fragColor = checkerboard(fragCoord, 32.0);
-    //fragColor = gradient(fragCoord, iResolution.xy);
-    fragColor = changingCircle(fragCoord, iTime, iResolution.xy);
-    // Normalized pixel coordinates (from 0 to 1)
-    //vec2 uv = fragCoord/iResolution.xy;
-
-    // Time varying pixel color
-    //vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
-
-    // Output to screen
-   	//fragColor = vec4(col,1.0);
+    
+    //fragColor = changingCircle(fragCoord, iTime, iResolution.xy);
+    
+    //fragColor = crazyEffect(fragCoord, iResolution.xy, iTime, iChannel0);
 }
