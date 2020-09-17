@@ -1,0 +1,36 @@
+#define colorRGB	vec3
+#define colorRGBA	vec4
+
+// This effect produces a static gradient with the colors green, yellow, black, and red
+vec4 gradient(in vec2 fragCoord, in vec2 resolution)
+{
+    // Have to 'normalize' the coordinates since color is clamped from 0 to 1
+    // and coordinates can range from 0 to the resolution size
+   	vec2 uv = fragCoord/resolution;
+    
+    // The red and green component change based on the coordinate, blue is always .1
+    colorRGB color = vec3(uv, 0.1);
+    float alpha = 1.0;
+    return colorRGBA(color, alpha);
+}
+
+vec4 checkerboard(in vec2 fragCoord)
+{
+    colorRGBA color = vec4(0.1, .6, 0.1, 1.0);
+    return color;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    fragColor = checkerboard(fragCoord);
+    //fragColor = gradient(fragCoord, iResolution.xy);
+    //fragColor = vec4(1.0,1.0,1.0,1.0);
+    // Normalized pixel coordinates (from 0 to 1)
+    //vec2 uv = fragCoord/iResolution.xy;
+
+    // Time varying pixel color
+    //vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
+
+    // Output to screen
+    //fragColor = vec4(col,1.0);
+}
