@@ -98,11 +98,11 @@ vec4 changingCircle(in vec2 fragCoord, in float time, in vec2 resolution)
     float yMinusCenter = fragCoord.y - centerY;
     // Add a varying green value
     // This also causes an abrupt color change when it jumps from 1.0 to .1
-    float gValue = (mod(iTime, 10.0) + 1.0) / 10.0;
+    float gValue = (mod(time, 10.0) + 1.0) / 10.0;
     
     // Calculate the background color
     // Absolute value is used to keep them from 0 to 1
-    colorRGB color = vec3(abs(sin(iTime)), gValue, abs(cos(iTime)));
+    colorRGB color = vec3(abs(sin(time)), gValue, abs(cos(time)));
     
     // if (x - Cx)^2 + (y - Cy)^2 <= radius^2 then the point is inside the circle
     if(pow(xMinusCenter, 2.0) + pow(yMinusCenter, 2.0) <= pow(radius, 2.0))
