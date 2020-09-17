@@ -96,6 +96,11 @@ vec4 changingCircle(in vec2 fragCoord, in float time, in vec2 resolution)
     return vec4(color, 1.0);
 }
 
+vec4 crazyEffect(in vec2 fragCoord)
+{
+	return vec4(1.0);
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     //fragColor = checkerboard(fragCoord, 32.0);
