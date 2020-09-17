@@ -1,0 +1,77 @@
+#define colorRGB	vec3
+#define colorRGBA	vec4
+
+// This effect produces a static gradient with the colors green, yellow, black, and red
+// Part of this code was provided by Daniel Buckstein
+vec4 gradient(in vec2 fragCoord, in vec2 resolution)
+{
+    // Have to 'normalize' the coordinates since color is clamped from 0 to 1
+    // and coordinates can range from 0 to the resolution size
+   	vec2 uv = fragCoord/resolution;
+    
+    // The red and green component change based on the coordinate, blue is always .1
+    // This way the desired gradient can be achieved
+    colorRGB color = vec3(uv, 0.1);
+    float alpha = 1.0;
+    return colorRGBA(color, alpha);
+}
+
+// Colors the screen in a blue/red checkboard with a square size that can be edited
+vec4 checkerboard(in vec2 fragCoord, in float squareSize)
+{
+    colorRGBA color;						// This is the color that will be returned
+    colorRGBA blue = vec4(0.0,0.0,0.8,1.0); // Create a value for the color blue
+    colorRGBA red = vec4(0.8,0.0,0.0,1.0);	// Create a value for the color read
+    
+    // For this next segment it's easy to visual each case in terms of a 2x2 grid
+    // The top left and bottom right of this 2x2 grid is blue
+    // The top right and bottom left of this 2x2 grid is red
+
+    // If the x coordinate modulus double the squareSize is less than square size
+    if(mod(fragCoord.x, squareSize * 2.0) < squareSize)
+    {
+        // If the y coordinate modulus double the square size is less than square size
+        if(mod(fragCoord.y, squareSize * 2.0) < squareSize)
+        {
+            // We are in the bottom left of the 2x2 grid and it should be red
+        	color = red; 
+        }
+        else // y coordinate is greater than square size
+        {
+            // We are in the top left of the 2x2 grid and it should be blue
+         	color = blue; 
+        }
+    }
+    else // x coordinate is greater than square size
+    {
+        // If the y coordinate modulus double the square size is greater than square size
+        if(mod(fragCoord.y, squareSize * 2.0) > squareSize) 
+        {
+            // We are in the top right of the 2x2 grid and it should be red
+         	color = red;    
+        }
+        else // y coordinate is less than square size
+        {
+            // We are in the bottom right of the 2x2 grid and it should be blue
+    		color = blue; 
+        }
+    }
+    
+    return color;
+    
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    fragColor = checkerboard(fragCoord, 32.0);
+    //fragColor = gradient(fragCoord, iResolution.xy);
+    
+    // Normalized pixel coordinates (from 0 to 1)
+    //vec2 uv = fragCoord/iResolution.xy;
+
+    // Time varying pixel color
+    //vec3 col = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
+
+    // Output to screen
+   	//fragColor = vec4(col,1.0);
+}
