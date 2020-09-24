@@ -1,3 +1,9 @@
+struct Sphere
+{
+    vec4 center;
+    float radius;
+};
+
 // calcViewport: calculate the viewing plane (viewport) coordinate
 //    viewport:       output viewing plane coordinate
 //    ndc:            output normalized device coordinate
@@ -44,22 +50,11 @@ void calcRay(out vec4 rayDirection, out vec4 rayOrigin,
     rayDirection = vec4(viewport.x, viewport.y, -focalLength, 0.0);
 }
 
+// Return the normalized version of a ray.
+// Not sure if length is the fastest function
 vec4 unitVector(in vec4 ray)
 {
  	return (ray / float(length(ray)));   
-}
-
-// calcColor: calculate the color of a pixel given a ray
-//    rayDirection: input ray direction
-//    rayOrigin:    input ray origin
-vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin)
-{
-    vec4 normRay = unitVector(rayDirection);
-    float blendAmount = 0.5f * (normRay.y + 1.0f);
-    
-    // DUMMY RESULT: OUTPUT RAY DIRECTION AS-IS
-    // -> what does the ray look like as color?
-    return mix(vec4(1.0f), vec4(0.5f, 0.7f, 1.0f, 1.0f), blendAmount);
 }
 
 // Returns the squared length of a ray
@@ -68,11 +63,38 @@ float lenSq(in vec4 ray)
     return (dot(ray, ray));
 }
 
+bool hitSphere(in Sphere sphere, in vec4 rayDirection, in vec4 rayOrigin)
+{
+    vec4 rayWithoutCenter = rayOrigin - sphere.center;
+    float a = lenSq(rayDirection);
+    float b = 2.0f * dot(rayWithoutCenter, rayDirection);
+    float c = lenSq(rayWithoutCenter) - (sphere.radius * sphere.radius);
+    float discriminant = b*b - 4.0f*a*c;
+	return (discriminant>0.0f);
+}
+
+// calcColor: calculate the color of a pixel given a ray
+//    rayDirection: input ray direction
+//    rayOrigin:    input ray origin
+vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in Sphere sphere)
+{
+    if(!hitSphere(sphere, rayDirection, rayOrigin))
+    {
+        vec4 normRay = unitVector(rayDirection);
+        float blendAmount = 0.5f * (normRay.y + 1.0f);
+        return mix(vec4(1.0f), vec4(0.5f, 0.7f, 1.0f, 1.0f), blendAmount);
+    }
+    return vec4(1.0f, 0.0f, 0.0f, 1.0f);
+}
+
 // mainImage: process the current pixel (exactly one call per pixel)
 //    fragColor: output final color for current pixel
 //    fragCoord: input location of current pixel in image (in pixels)
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
+    Sphere sphere;
+    sphere.center = vec4(0.0,0.0,-1.0, 1.0);
+    sphere.radius = 0.5f;
     // viewing plane (viewport) info
     vec2 viewport, ndc, uv, resolutionInv;
     float aspect;
@@ -88,7 +110,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
             viewport, focalLength);
 
     // color
-    fragColor = calcColor(rayDirection, rayOrigin);
+    fragColor = calcColor(rayDirection, rayOrigin, sphere);
 
     // TEST COLOR:
     //  -> what do the other things calculated above look like?
