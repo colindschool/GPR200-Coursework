@@ -80,6 +80,23 @@ bool initSphere(out Sphere sphere,
     return false;
 }
 
+struct PointLight
+{
+	vec4 center; // Location of light source
+    vec4 color;	 // The color of the light
+    float lIntensity; // The intensity of the light
+    
+};
+    
+void initLight(in vec3 center, in vec4 color, in float intensity,
+               out PointLight light)
+{
+    light.center = asPoint(center);
+    light.color = color;
+    light.lIntensity = intensity;
+      
+}
+
 float lenSq(vec2 x)
 {
  	return dot(x, x);   
@@ -97,6 +114,9 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin)
     // SCENE
     Sphere sphere;
     initSphere(sphere, vec3(0.0, 0.0, -4.0), 0.5);
+    
+    PointLight light;
+    initLight(vec3(0.0), vec4(1.0), 10.0f, light);
     
     // testing proc sphere
     vec3 dp;
