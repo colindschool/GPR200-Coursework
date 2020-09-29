@@ -116,7 +116,7 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin)
     initSphere(sphere, vec3(0.0, 0.0, -4.0), 0.5);
     
     PointLight light;
-    initLight(vec3(1.0, 1.0, -1.5), vec4(1.0), 50.0f, light);
+    initLight(vec3(1.0, 1.0, -3.0), vec4(1.0), 50.0f, light);
     
     // testing proc sphere
     vec3 dp;
@@ -130,13 +130,23 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin)
     	dp.z = rSq - lSq;
         vec3 position = sphere.center.xyz + vec3(dp.x, dp.y, sqrt(dp.z));
         vec3 normal = (position - sphere.center.xyz) / sphere.radius;
+       	vec3 normalAdjusted = (normal + 1.0f) * 0.5f;
         
         // Calculate the light's diffuse coefficient
         vec3 normLight = normalize(light.center - position);
-        float difCo = max(0.0f, dot(normal, normLight));
+        float difCo = max(0.0f, dot(normalAdjusted, normLight));
         float dist = distance(light.center, position);
         float attenInt = 1.0f / (1.0f + (dist / light.lIntensity) + ((dist * dist) / (light.lIntensity * light.lIntensity)));
-        vec3 finalColor = ((attenInt * difCo) * light.color.xyz);
+        
+        
+        // Phong reflectance
+        vec3 viewVec = normalize((vec3(0.0) - position));
+        vec3 refLightVec = reflect(-normLight, normal);
+        float specCo = max(0.0f, dot(viewVec, refLightVec));
+        float specInt = pow(specCo, 32.0f);
+        
+        vec3 finalColor = 0.1 * vec3(0.1, 0.1, 0.1) + (((difCo * attenInt) * normalAdjusted + specInt * vec3(1.0)) * light.color.rgb);
+        
 		return vec4(finalColor, 1.0f);
         
     }
