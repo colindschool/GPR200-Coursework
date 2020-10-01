@@ -3,6 +3,13 @@
 // Edited by Colin Deane
 // Edit description:
 // Implemented various light sources as well as used Blinn-Phong reflectance to get a certain lighting
+// 
+// Sources:
+// Daniel S. Buckstein
+//		Provided the code framework as well as the steps for creating lights
+
+// Stina Bridgeman
+//		Provided the equation for basic cel-shading
 
 // asPoint: promote a 3D vector into a 4D vector representing a point (w=1)
 //    point: input 3D vector
@@ -189,6 +196,12 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in float time)
     vec3 globalCol = vec3(0.1, 0.4, 0.4);
     // Add ambient lighting on top of the rest of the color
     finalColor += (globalInt * globalCol);
+    
+    // Basic cel shading
+    // Source for this equation comes from Stina Bridgeman of Hobart and William Smith Colleges
+    //		Source comes from this pdf: http://math.hws.edu/bridgeman/courses/424/f19/inclass/lab7.pdf
+    float steps = 15.0f;
+    finalColor = floor(finalColor * steps) / steps;
 	return vec4(finalColor, 1.0f);
     
 
