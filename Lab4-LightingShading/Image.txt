@@ -161,6 +161,7 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in float time)
     for(int i = NUM_LIGHTS - 1; i >= 0; --i)
     {
 
+        // LAMBERTIAN REFLECTANCE
         // float dist = distance(lights[i].center, position);
         // distance is just the length factor of the two subtracted vectors
         // since that is reused, I thought it would be useful to store
@@ -176,12 +177,12 @@ vec4 calcColor(in vec4 rayDirection, in vec4 rayOrigin, in float time)
         float invInt2 = invInt * invInt;
         // Calculate attenuation
         float attenInt = 1.0f / (1.0f + (dist * invInt) + ((dist * dist) * invInt));
-        float ID = difCo * attenInt;
+        float ID = difCo * attenInt; // Diffuse intensity
 
 
         // Blinn-Phong reflectance
         vec3 viewVec = normalize((vec3(0.0) - position)); // Viewer Vector - V
-        vec3 halfwayVec = normalize(normLight + viewVec); // Halflway Vector - H
+        vec3 halfwayVec = normalize(normLight + viewVec); // Halfway Vector - H
         
         // Calculate the specular coefficent and the specular intensity
         float specCo = max(0.0f, dot(normal, halfwayVec));
