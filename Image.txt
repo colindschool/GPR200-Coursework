@@ -168,7 +168,9 @@ void initRayOrtho(out sRay ray,
 // -----------------------------------------------------------
 // EFFECT FUNCTIONS
 
-vec4 crossFade(in sViewport vp)
+// Cross fade
+// Takes in the viewport and time and returns a color
+color4 crossFade(in sViewport vp)
 {
     float blendVal = abs(sin(iTime));
     sCoord loc = vp.pixelCoord / iChannelResolution[0].xy;
@@ -183,6 +185,29 @@ vec4 crossFade(in sViewport vp)
  	return blend;   
 }
 
+// Wave distortion
+// Takes in the pixel coordinate
+// The y coordinate is what is distorted
+sDCoord waveDistortion(in sCoord pc, in sDCoord resolution,in bool continualDistortion)
+{    
+    // If the user wants gradual distortion over time
+    if(continualDistortion)
+    {
+        // Change the y coordinate by adding a value between -10 and 10 to it.
+    	// This is additive over time since it builds on the distortion that is already calculated
+    	// abs(pc.x - (resolution.x * .5)) : absolute value of the x coordinate minus half the resolution width
+        // ^^^ This makes it distorted around the center of the screen horizontally
+        // * .01 : Slow down the distortion
+        pc.y += 10. * cos(abs(pc.x - (resolution.x * .5)) * iTime * .01);
+    }
+    else // If the user just wants a one time distortion
+    {
+        // time is removed but to make a significant wave, 100 to -100 is the distortion range of y
+        pc.y += 100. * cos(abs(pc.x - (resolution.x * .5)));
+    }
+    // Return the distorted pixel coordinate
+ 	return (pc);   
+}
 
 //------------------------------------------------------------
 // RENDERING FUNCTIONS
@@ -217,18 +242,22 @@ color4 calcColor(in sViewport vp, in sRay ray)
     
     // cube map
     // sampler type: samplerCube
-    vec3 cubeLoc = ray.direction.xyz;
+    //vec3 cubeLoc = ray.direction.xyz;
     //return vec4(cubeLoc, 1.0);
-    return texture(iChannel2, cubeLoc);
+    //return texture(iChannel2, cubeLoc);
     
-
-}
-
-sCoord wave(in sCoord originalLocation)
-{
- 	sCoord deformedLocation;
-    // do something
-    return deformedLocation;
+	//return crossFade(vp);
+    
+    // DISTORTION
+    // Calculate the distorted pixel coordinate with waveDistortion
+    
+    //loc = waveDistortion(vp.pixelCoord, vp.resolution, false);
+    sDCoord disPC = waveDistortion(vp.pixelCoord, vp.resolution, true);
+    
+    // Convert the distorted pixel coordinate to UV coordinates
+    sCoord disUV = disPC * vp.resolutionInv;
+    
+    return texture(iChannel0, disUV);
 }
 
 //------------------------------------------------------------
