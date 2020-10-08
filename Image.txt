@@ -170,17 +170,20 @@ void initRayOrtho(out sRay ray,
 
 // Cross fade
 // Takes in the viewport and time and returns a color
-color4 crossFade(in sViewport vp)
-{
-    float blendVal = abs(sin(iTime));
-    sCoord loc = vp.pixelCoord / iChannelResolution[0].xy;
-    sScalar ratio = iChannelResolution[0].y * vp.resolutionInv.y;
-    loc *= ratio;
+color4 crossFade(in sViewport vp,in float time, in sampler2D text1, in sampler2D text2, in sDCoord channelResolution)
+{ 
+    //Adjust coordinates for correctly displaying the texture
+    sCoord loc = vp.pixelCoord / channelResolution;
+    loc *= channelResolution.y * vp.resolutionInv.y;
     
+    // Calculate the blend value
+    float blendVal = abs(sin(time));
     
-    vec4 tex1 = texture(iChannel0, loc);
-    vec4 tex2 = texture(iChannel1, loc);
-    vec4 blend = mix(tex1, tex2, blendVal);
+    // Sample the two textures at the coordinates 
+    color4 tex1 = texture(text1, loc);
+    color4 tex2 = texture(text2, loc);
+    // Blend the two samples based on the blending value
+    color4 blend = mix(tex1, tex2, blendVal);
     
  	return blend;   
 }
@@ -188,26 +191,87 @@ color4 crossFade(in sViewport vp)
 // Wave distortion
 // Takes in the pixel coordinate
 // The y coordinate is what is distorted
-sDCoord waveDistortion(in sCoord pc, in sDCoord resolution,in bool continualDistortion)
+sDCoord waveDistortion(in sCoord pc, in sDCoord resolution, in float time, in bool continualDistortion)
 {    
+    float xCoordCalc = abs(pc.x - (resolution.x * .5));
+    // abs(pc.x - (resolution.x * .5)) : absolute value of the x coordinate minus half the resolution width
+    // ^^^ This makes the distortion symmetrical in its effect
+    // The far ends of the screen will have equal xCoordCalc
+    
     // If the user wants gradual distortion over time
     if(continualDistortion)
     {
         // Change the y coordinate by adding a value between -10 and 10 to it.
     	// This is additive over time since it builds on the distortion that is already calculated
-    	// abs(pc.x - (resolution.x * .5)) : absolute value of the x coordinate minus half the resolution width
-        // ^^^ This makes it distorted around the center of the screen horizontally
         // * .01 : Slow down the distortion
-        pc.y += 10. * cos(abs(pc.x - (resolution.x * .5)) * iTime * .01);
+        pc.y += 10. * cos(xCoordCalc * time * .01);
     }
     else // If the user just wants a one time distortion
     {
         // time is removed but to make a significant wave, 100 to -100 is the distortion range of y
-        pc.y += 100. * cos(abs(pc.x - (resolution.x * .5)));
+        pc.y += 100. * cos(xCoordCalc);
     }
     // Return the distorted pixel coordinate
  	return (pc);   
 }
+
+// Structure for a PointLight
+struct PointLight
+{
+	sBasis center; // Location of light source
+    color4 color;	 // The color of the light
+    float lIntensity; // The intensity of the light
+    
+};
+
+// Initialize a PointLight structure
+void initLight(in sBasis center, in color4 color, in float intensity,
+               out PointLight light)
+{
+    light.center = center;			// Center of the light
+    light.color = color;			// Color of the light
+    light.lIntensity = intensity;	// Intensity of the light
+      
+}
+
+// Implement Lambertian shading onto a texture
+color4 shading(in sViewport vp, in sampler2D text, in float time)
+{
+    // Construct a light
+    PointLight light;
+    //  Initialize the light
+    //	Center:
+    //	Color: White
+    //	Intensity: 100
+    initLight(sBasis(sin(time), -cos(time), 0.6), color4(1.0), 100.0,light);
+    
+    // Get the surface position and normal
+    sBasis surfacePos = sBasis(vp.ndc, 0.3);
+    sBasis surfaceNorm = normalize(vec3(vp.ndc, 1.0));
+    
+    // Calculate some important variables
+    sBasis distVec = light.center - surfacePos; 	 // The vector difference between the light's center and the texture surface
+    float lightLength = sqrt(dot(distVec, distVec)); // Get the length of that distance 
+    sBasis lightNorm = distVec / lightLength;		 // Normalize the light vector
+    
+    float kD = max(0.0f, dot(surfaceNorm, lightNorm)); // Diffuse coefficient
+    
+    // Attenuation
+    float invIntensity = 1. / light.lIntensity;
+    float distOIntensity = lightLength * invIntensity; // Light length / light intensity
+    // iL = attenuated intensity of the light
+    float iL = 1. / (1. + (distOIntensity) + (distOIntensity * distOIntensity));
+    
+    float iD = kD * iL;  // Diffuse Intensity
+    
+    // Sample the texture at that coordinate
+    color4 texColor = texture(text, vp.ndc);
+    
+    // Return the texture color * diffuse intensity * light color
+ 	return color4(texColor * iD * light.color);   
+}
+
+
 
 //------------------------------------------------------------
 // RENDERING FUNCTIONS
@@ -215,30 +279,20 @@ sDCoord waveDistortion(in sCoord pc, in sDCoord resolution,in bool continualDist
 // calcColor: calculate the color of current pixel
 //	  vp:  input viewport info
 //	  ray: input ray info
-color4 calcColor(in sViewport vp, in sRay ray)
+color4 calcColor(in sViewport vp, in sRay ray, in float time,
+                 in sampler2D text1, in sampler2D text2, in samplerCube textCube,
+                 in sDCoord channelResolution)
 {
-    // test inputs
-    //return color4(ray.direction.xyz == vp.viewportPoint.xyz); // pass
-    //return color4(lengthSq(vp.viewportPoint.xy) >= 0.25); // pass
-    //return color4(vp.uv, 0.0, 0.0);
-    //return color4(vp.ndc, 0.0, 0.0);
-    //return vp.viewportPoint;
-    
-    sCoord px = vp.pixelCoord;
-    sDCoord res = iChannelResolution[0].xy;
-    sScalar ratio = res.y * vp.resolutionInv.y;
-    sCoord loc = px / res;
-    loc.x = ratio * loc.x + 0.1 * iTime + sin(iTime);
-    loc.y = ratio * loc.y - 0.1 * iTime + cos(iTime);
+ 	//sCoord px = vp.pixelCoord;
+    //sDCoord res = iChannelResolution[0].xy;
+    //sScalar ratio = res.y * vp.resolutionInv.y;
+    //sCoord loc = px / res;
+    //loc.x = ratio * loc.x;
+    //loc.y = ratio * loc.y;
     //return texture(iChannel0, loc);
     
     //vec4 color = crossFade(vp);
     //return color;
-
-	// Test surface position and normal
-    //return vp.viewportPoint; // Position on the plane
-    //return vec4(0.0, 0.0, 1.0, 1.0); // Z axis is the color blue 
-    //return vec4(normalize(vec3(vp.viewportPoint.xy, 1.0)), 1.0);
     
     // cube map
     // sampler type: samplerCube
@@ -246,18 +300,19 @@ color4 calcColor(in sViewport vp, in sRay ray)
     //return vec4(cubeLoc, 1.0);
     //return texture(iChannel2, cubeLoc);
     
-	//return crossFade(vp);
+    // CROSSFADE
+	return crossFade(vp, time, text1, text2, channelResolution);
     
     // DISTORTION
     // Calculate the distorted pixel coordinate with waveDistortion
-    
-    //loc = waveDistortion(vp.pixelCoord, vp.resolution, false);
-    sDCoord disPC = waveDistortion(vp.pixelCoord, vp.resolution, true);
-    
+    //sDCoord disPC = waveDistortion(vp.pixelCoord, vp.resolution, time, false); // One time
+    //sDCoord disPC = waveDistortion(vp.pixelCoord, vp.resolution, time, true);	 // Over time
     // Convert the distorted pixel coordinate to UV coordinates
-    sCoord disUV = disPC * vp.resolutionInv;
+    //sCoord disUV = disPC * vp.resolutionInv;
+    //return texture(text1, disUV);
     
-    return texture(iChannel0, disUV);
+	// SHADING
+    return shading(vp, iChannel1, time);
 }
 
 //------------------------------------------------------------
@@ -281,5 +336,5 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     // render
     initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
     initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
-    fragColor += calcColor(vp, ray);
+    fragColor += calcColor(vp, ray, iTime, iChannel0, iChannel1, iChannel2, iChannelResolution[0].xy);
 }
