@@ -271,7 +271,31 @@ color4 shading(in sViewport vp, in sampler2D text, in float time)
  	return color4(texColor * iD * light.color);   
 }
 
-
+// Cube Map rotation
+// Rotate around the y axis in a cube map
+// Also applies the wave distortion done in effect #2
+// Rotation matrix equation from Dr. Peyam
+//		Source: https://youtu.be/Ta8cKqltPfU
+color4 cubeMap(in sRay ray, in sViewport vp, in samplerCube cube, in float time)
+{
+    // Get the location of the cube (by getting the direction of the ray)
+    vec3 cubeLocation = ray.direction.xyz;
+    
+    // Calculate the rotation based on time
+    // Multiply by 360 to convert from radians to degrees
+    float rotation = cos(time * .01) * 360.;
+    // Create a rotation matrix
+    mat2 rotMatrix = mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+    
+    // Change where the cube location is based on the rotation matrix
+    cubeLocation.xz *= rotMatrix;
+    
+    // Add the wave distortion affect to the pixel coordinates
+    // .xy because those are 2D coordinates that are being sampled from
+    cubeLocation.xy += waveDistortion(vp.pixelCoord, vp.resolution, time, true) * vp.resolutionInv;
+  
+    return texture(cube, cubeLocation);
+}
 
 //------------------------------------------------------------
 // RENDERING FUNCTIONS
@@ -283,25 +307,8 @@ color4 calcColor(in sViewport vp, in sRay ray, in float time,
                  in sampler2D text1, in sampler2D text2, in samplerCube textCube,
                  in sDCoord channelResolution)
 {
- 	//sCoord px = vp.pixelCoord;
-    //sDCoord res = iChannelResolution[0].xy;
-    //sScalar ratio = res.y * vp.resolutionInv.y;
-    //sCoord loc = px / res;
-    //loc.x = ratio * loc.x;
-    //loc.y = ratio * loc.y;
-    //return texture(iChannel0, loc);
-    
-    //vec4 color = crossFade(vp);
-    //return color;
-    
-    // cube map
-    // sampler type: samplerCube
-    //vec3 cubeLoc = ray.direction.xyz;
-    //return vec4(cubeLoc, 1.0);
-    //return texture(iChannel2, cubeLoc);
-    
     // CROSSFADE
-	return crossFade(vp, time, text1, text2, channelResolution);
+	//return crossFade(vp, time, text1, text2, channelResolution);
     
     // DISTORTION
     // Calculate the distorted pixel coordinate with waveDistortion
@@ -312,7 +319,9 @@ color4 calcColor(in sViewport vp, in sRay ray, in float time,
     //return texture(text1, disUV);
     
 	// SHADING
-    return shading(vp, iChannel1, time);
+    //return shading(vp, iChannel1, time);
+    
+    return cubeMap(ray, vp, textCube, time);
 }
 
 //------------------------------------------------------------
