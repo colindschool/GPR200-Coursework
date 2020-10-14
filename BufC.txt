@@ -1,0 +1,27 @@
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    sCoord uv = fragCoord / iChannelResolution[0].xy;
+    
+    // Texture samples from 0 - 1.
+    // That means to get adjacent pixels, a small amount needs to be added
+    
+    sCoord invRes = 1.0 / iChannelResolution[0].xy;
+    
+    float kernelWeight = 1.0/16.0;
+    
+    vec4 topLeft = texture(iChannel0, vec2(uv.x - invRes.x, uv.y + invRes));
+    vec4 topMiddle = 2.0 * texture(iChannel0, vec2(uv.x, uv.y + invRes));
+    vec4 topRight = texture(iChannel0, vec2(uv.x + invRes.x, uv.y + invRes));
+    vec4 middleLeft = 2.0 * texture(iChannel0, vec2(uv.x - invRes.x, uv.y));
+    vec4 middleMiddle = 4.0 * texture(iChannel0, uv);
+    vec4 middleRight = 2.0 * texture(iChannel0, vec2(uv.x + invRes.x, uv.y));
+    vec4 botLeft = texture(iChannel0, vec2(uv.x - invRes.x, uv.y - invRes));
+    vec4 botMiddle = 2.0 * texture(iChannel0, vec2(uv.x, uv.y - invRes));
+    vec4 botRight = texture(iChannel0, vec2(uv.x + invRes.x, uv.y - invRes));
+    
+    vec4 combined = kernelWeight * (topLeft + topMiddle + topRight
+                                    + middleLeft + middleMiddle + middleRight
+                                    + botLeft + botMiddle + botRight);    
+    
+    fragColor = combined;
+}
