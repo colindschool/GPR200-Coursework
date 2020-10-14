@@ -1,0 +1,11 @@
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    sCoord uv = fragCoord / iChannelResolution[0].xy;
+    
+    vec4 color = texture(iChannel0, uv);
+    float luma =  0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+    
+    float lumThresh = .5;
+    fragColor = color * clamp(luma - lumThresh, 0.0, 1.0) * (1.0 / (1.0 - lumThresh));
+
+}
