@@ -4,20 +4,33 @@
 //------------------------------------------------------------
 // RENDERING FUNCTIONS
 
-// calcColor: calculate the color of current pixel
-//	  vp:  input viewport info
-//	  ray: input ray info
-color4 calcColor(in sViewport vp, in sRay ray)
+// calcSampleLocation: calculate the sample location on the cubemap
+//	  cubeLocation: input base coordinates 
+//	  time:		input time
+sBasis calcSampleLocation(in sBasis cubeLocation, in float time)
 {
-    // test inputs
-    //return color4(ray.direction.xyz == vp.viewportPoint.xyz); // pass
-    //return color4(lengthSq(vp.viewportPoint.xy) >= 0.25); // pass
-    //return color4(vp.uv, 0.0, 0.0);
-    //return color4(vp.ndc, 0.0, 0.0);
-    vec3 cubeLocation = ray.direction.xyz;
-    vec4 c = texture(iChannel0, cubeLocation);
-    c.rgb = vec3(1.0) - exp(-c.rgb * 0.5);
-    return c;
+    // Calculate the cos and sin of the time
+    float cosTime = cos(time);
+    float sinTime = sin(time);
+    
+    // Get the sample location by taking in the base location and multiplying by a rotation matrix
+    sBasis sampleLocation = cubeLocation * mat3(cosTime, 0.0, sinTime, 0.0, 1.0, 0.0, -sinTime, 0.0, cosTime);
+
+    // Return the sample location
+    return sampleLocation;
+}
+
+// calcColor: calculate the color of current pixel
+//	  vp:   	input viewport info
+//	  ray:  	input ray info
+//	  sampText: 	input sampler for a texture
+//	  time: 	input time
+color4 calcColor(in sViewport vp, in sRay ray, in samplerCube sampText, in float time)
+{
+    // Calculate the location to sample from
+    vec3 cubeLocation = calcSampleLocation(ray.direction.xyz, time);
+    
+    return texture(sampText, cubeLocation);
 }
 
 
@@ -42,5 +55,5 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     // render
     initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
     initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
-    fragColor += calcColor(vp, ray);
+    fragColor += calcColor(vp, ray, iChannel0, iTime);
 }
