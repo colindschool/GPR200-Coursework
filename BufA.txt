@@ -1,38 +1,5 @@
 // GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
-//  -> BUFFER A TAB (scene)
-
-//------------------------------------------------------------
-// RENDERING FUNCTIONS
-
-// calcSampleLocation: calculate the sample location on the cubemap
-//	  cubeLocation: input base coordinates 
-//	  time:		input time
-sBasis calcSampleLocation(in sBasis cubeLocation, in float time)
-{
-    // Calculate the cos and sin of the time
-    float cosTime = cos(time);
-    float sinTime = sin(time);
-    
-    // Get the sample location by taking in the base location and multiplying by a rotation matrix
-    sBasis sampleLocation = cubeLocation * mat3(cosTime, 0.0, sinTime, 0.0, 1.0, 0.0, -sinTime, 0.0, cosTime);
-
-    // Return the sample location
-    return sampleLocation;
-}
-
-// calcColor: calculate the color of current pixel
-//	  vp:   	input viewport info
-//	  ray:  	input ray info
-//	  sampText: 	input sampler for a texture
-//	  time: 	input time
-color4 calcColor(in sViewport vp, in sRay ray, in samplerCube sampText, in float time)
-{
-    // Calculate the location to sample from
-    vec3 cubeLocation = calcSampleLocation(ray.direction.xyz, time);
-    
-    return texture(sampText, cubeLocation);
-}
-
+//  -> IMAGE TAB (final)
 
 //------------------------------------------------------------
 // SHADERTOY MAIN
@@ -42,18 +9,40 @@ color4 calcColor(in sViewport vp, in sRay ray, in samplerCube sampText, in float
 //    fragCoord: input location of current pixel in image (in pixels)
 void mainImage(out color4 fragColor, in sCoord fragCoord)
 {
-    // viewing plane (viewport) inputs
-    const sBasis eyePosition = sBasis(0.0);
-    const sScalar viewportHeight = 2.0, focalLength = 1.5;
+    // setup
+    // test UV for input image
+    sCoord uv = fragCoord / iChannelResolution[0].xy;
     
-    // viewport info
-    sViewport vp;
-
-    // ray
-    sRay ray;
+    // TESTING
+    // set iChannel0 to 'Misc/Buffer A' and fetch sample
     
-    // render
-    initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
-    initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
-    fragColor += calcColor(vp, ray, iChannel0, iTime);
+    vec4 blur = texture(iChannel0, uv);
+    vec4 original = texture(iChannel1, uv);
+    
+    // COMPOSITE COLORS
+    
+    vec4 m = mix(original, blur, .1);
+    
+    fragColor = m;
+    // Add the original and the blur together
+    //fragColor = original + blur;
+    
+    fragColor = 1. - (1. - original) * (1. - blur);
+    
 }
+
+// Bonuses
+// Do the blur in multiple passes
+// Break the blur into a horizontal and vertical pass
+// In the example of a 3x3 kernal, it is a product of 2 1x3 kernals
+// Add Buffer D samples from Buffer C (which is horizontally blurred)
+// Order doesnt matter for kernals
+
+// Sobel filter
+
+// Custom cubemap
+// Cubemap A tab
+// Write your own cubemap and sample from that
+
+// Sound
+// Get a function with a respect to time and you can read that in
