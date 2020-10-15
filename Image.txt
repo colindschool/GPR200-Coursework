@@ -40,6 +40,7 @@ color4 cMix(in color4 original, in color4 blur)
 // screen: Double inversion and multiplication
 //	original:	input original color (Buffer A)
 //	blur:		input blur color (Buffer C)
+//	weight:		input weight for the inversion
 // Source for screen function comes from Wikipedia
 //		Link: https://en.wikipedia.org/wiki/Blend_modes#Screen
 color4 screen(in color4 original, in color4 blur, in float weight)
@@ -50,6 +51,7 @@ color4 screen(in color4 original, in color4 blur, in float weight)
 // overlay: overlay the original with the blur
 //	original:	input original color (Buffer A)
 //	blur:		input blur color (Buffer C)
+//	originalblurx2:	input 2 * blur * original
 // Source for overlay function comes from Wikipedia
 //		Link: https://en.wikipedia.org/wiki/Blend_modes#Overlay
 color4 overlay(in color4 original, in color4 blur, in color4 originalblurx2)
@@ -63,7 +65,12 @@ color4 overlay(in color4 original, in color4 blur, in color4 originalblurx2)
  	return screen(original, blur, 2.0);   
 	// OLD: return 1.0 - 2.0 * (1.0 - original) * (1.0 - blur);
 }
-
+// softLight: composition function for having soft light
+//	original:	input original color (Buffer A)
+//	blur: 		input blur color (Buffer C)
+//	originalblurx2:	input 2 * blur * original
+// Source for overlay function comes from Wikipedia
+//		Link: https://en.wikipedia.org/wiki/Blend_modes
 color4 softLight(in color4 original, in color4 blur, in color4 originalblurx2)
 {
  	return (1. - 2. * blur) * original * original + originalblurx2;   
