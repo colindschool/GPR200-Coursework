@@ -1,12 +1,33 @@
+// BUFFER C TAB
+// 
+//
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    sCoord uv = fragCoord / iChannelResolution[0].xy;
+    // UV for input texture
+	sDCoord uv = fragCoord / iChannelResolution[0].xy;
     
     // Texture samples from 0 - 1.
-    // That means to get adjacent pixels, a small amount needs to be added
+    // That means to get adjacent texels, a small amount needs to be added
+    // Only done in y since this is a vertical pass. Half since this is used for edge sampling
+    float halfInvResY = (1.0 / iChannelResolution[0].y);
+    float offsetOneAndHalf = 3. * halfInvResY;
     
-    sCoord invRes = 1.0 / iChannelResolution[0].xy;
+    // Doing a 5x5 kernel sampling from the edges of texels (thereby only requiring 4 samples)
+    // The normalizer for a 5x5 (that only uses 4 samples) is 1/8
+    // This is because the kernel is [1, 3, 3, 1]
+    float edgeNormalizer5x5 =  0.125; 	// Normalizer for the 1 in the kernel
+    float edgeNormalizer5x5mid = 0.375; // Normalizer for the 3 in the kernel
     
+    color4 color5x5 = getColorNormalized(vec2(uv.x, uv.y + offsetOneAndHalf), iChannel0, edgeNormalizer5x5);
+    color5x5 += getColorNormalized(vec2(uv.x, uv.y + halfInvResY), iChannel0, edgeNormalizer5x5mid);
+    color5x5 += getColorNormalized(vec2(uv.x, uv.y - halfInvResY), iChannel0, edgeNormalizer5x5mid);
+    color5x5 += getColorNormalized(vec2(uv.x, uv.y - offsetOneAndHalf), iChannel0, edgeNormalizer5x5);
+    
+    fragColor = color5x5;
+    
+    /*
+    // OLD, INEFFICIENT 3x3 one-pass kernel
+    vec2 invRes = 1.0 / iChannelResolution[0].xy;
     float kernelWeight = 1.0/16.0;
     
     vec4 topLeft = texture(iChannel0, vec2(uv.x - invRes.x, uv.y + invRes));
@@ -21,7 +42,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     vec4 combined = kernelWeight * (topLeft + topMiddle + topRight
                                     + middleLeft + middleMiddle + middleRight
-                                    + botLeft + botMiddle + botRight);    
+                                    + botLeft + botMiddle + botRight); 
+	
     
     fragColor = combined;
+	*/
 }

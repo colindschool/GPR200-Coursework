@@ -69,6 +69,16 @@ sScalar lengthSq(sVector x)
     return dot(x, x);
 }
 
+// UTILITY FUNCTIONS
+// getColorNormalized: Gets the normalized color of a texel at a certain point
+//		point: 		the point at which to sample from
+//		sampText:	the texture to sample from
+//		normalizer:	the amount that is required to normalize the color
+color4 getColorNormalized(in sCoord point, in sampler2D sampText, in float normalizer)
+{
+ 	vec4 color = texture(sampText, point) * normalizer;   
+    return color;
+}
 
 //------------------------------------------------------------
 // VIEWPORT INFO
