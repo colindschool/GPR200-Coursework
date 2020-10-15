@@ -29,5 +29,5 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // Calculate the Luma
     float luma = calcLuma(color);
     // Multiply the color by the luma a bunch to get black/white
-    fragColor = color * luma * luma * luma * luma * luma;
+    fragColor = color * luma * luma * luma;
 }

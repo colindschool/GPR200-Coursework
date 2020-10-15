@@ -92,11 +92,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float offsetOneAndHalf = 3. * halfInvResX;
     
     color4 color5x5 = horizontalBlur5x5(uv, halfInvResX, offsetOneAndHalf);
-    
     fragColor = color5x5;
     
     color4 color13x13 = horizontalBlur13x13(uv, halfInvResX, offsetOneAndHalf);
-    
     fragColor = color13x13;
     
 }

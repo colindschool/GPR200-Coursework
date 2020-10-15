@@ -94,7 +94,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     fragColor = color5x5;
     
     color4 color13x13 = verticalBlur13x13(uv, halfInvResY, offsetOneAndHalf);
-    
     fragColor = color13x13;
     
     /*

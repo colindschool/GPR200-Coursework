@@ -42,9 +42,9 @@ color4 cMix(in color4 original, in color4 blur)
 //	blur:		input blur color (Buffer C)
 // Source for screen function comes from Wikipedia
 //		Link: https://en.wikipedia.org/wiki/Blend_modes#Screen
-color4 screen(in color4 original, in color4 blur)
+color4 screen(in color4 original, in color4 blur, in float weight)
 {
- 	return 1.0 - (1.0 - original) * (1.0 - blur);   
+ 	return 1.0 - weight * (1.0 - original) * (1.0 - blur);   
 }
 
 // overlay: overlay the original with the blur
@@ -52,21 +52,21 @@ color4 screen(in color4 original, in color4 blur)
 //	blur:		input blur color (Buffer C)
 // Source for overlay function comes from Wikipedia
 //		Link: https://en.wikipedia.org/wiki/Blend_modes#Overlay
-color4 overlay(in color4 original, in color4 blur)
+color4 overlay(in color4 original, in color4 blur, in color4 originalblurx2)
 {
     float luma =  calcLuma(original);
     if(luma < 0.5)
     {
-    	return 2.0 * original * blur;    
+    	return originalblurx2;    
     }
-        
- 	return 1.0 - 2.0 * (1.0 - original) * (1.0 - blur);   
+    
+ 	return screen(original, blur, 2.0);   
+	// OLD: return 1.0 - 2.0 * (1.0 - original) * (1.0 - blur);
 }
 
-// Edge detection
-color4 edgeDetection(in sCoord uv)
+color4 softLight(in color4 original, in color4 blur, in color4 originalblurx2)
 {
-	return vec4(1.0);
+ 	return (1. - 2. * blur) * original * original + originalblurx2;   
 }
 
 // mainImage: process the current pixel (exactly one call per pixel)
@@ -83,8 +83,12 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     
     // COMPOSITE COLORS
     
+    color4 originalblurx2 = 2. * original * blur;
+    
     fragColor = addition(original, blur);
-    fragColor = cMix(original, blur);
-    fragColor = screen(original, blur);
-    //fragColor = overlay(original, blur);
+    //fragColor = cMix(original, blur);
+    //fragColor = overlay(original, blur, originalblurx2);
+    //fragColor = screen(original, blur, 1.0);
+    //fragColor = softLight(original, blur, originalblurx2);
+    
 }
