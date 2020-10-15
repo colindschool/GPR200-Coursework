@@ -1,3 +1,85 @@
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//		File name: Buffer D
+//		Purpose: Perform a horizontal Gaussian blur
+
+// horizontalBlur5x5: Use a Gaussian blur horizontally, with a 5x5 kernel
+//	uv: 				input uv coordinate
+//	halfInvResX:		input half the distance between texels 
+//	offsetOneAndHalf:	input offset for getting 1.5 texels away
+color4 horizontalBlur5x5(in sCoord uv, in float halfInvResX, in float offsetOneAndHalf)
+{
+    // Doing a 5x5 kernel sampling from the edges of texels (thereby only requiring 4 samples)
+    // The normalizer for a 5x5 (that only uses 4 samples) is 1/8
+    // This is because the kernel is [1, 3, 3, 1]
+    // Kernel numbers from Pascal's triangle
+    //		Link: https://en.wikipedia.org/wiki/Pascal%27s_triangle
+    float edgeNormalizer5x5 =  0.125; 	// Normalizer for the 1 in the kernel
+    float edgeNormalizer5x5mid = 0.375; // Normalizer for the 3 in the kernel
+    
+    // Get all the pixels with (-1.5, -0.5, 0.5, 1.5) offset 
+    // Use getColorNormalized (which is in the common tab)
+    color4 color5x5 = getColorNormalized(vec2(uv.x - (offsetOneAndHalf), uv.y) , iChannel0, edgeNormalizer5x5);
+    color5x5 += getColorNormalized(vec2(uv.x - halfInvResX, uv.y), iChannel0, edgeNormalizer5x5mid);
+    color5x5 += getColorNormalized(vec2(uv.x + halfInvResX, uv.y), iChannel0, edgeNormalizer5x5mid);
+    color5x5 += getColorNormalized(vec2(uv.x + (offsetOneAndHalf), uv.y), iChannel0, edgeNormalizer5x5);
+
+	return color5x5;
+}
+
+// horizontalBlur13x13: Use a Gaussian blur horizontally, with a 13x13 kernel
+//	uv: 				input uv coordinate
+//	halfInvResX:		input half the distance between texels 
+//	offsetOneAndHalf:	input offset for getting 1.5 texels away
+color4 horizontalBlur13x13(in sCoord uv, in float halfInvResX, in float offsetOneAndHalf)
+{
+	// Doing a 13x13 kernel sampling from the edges of texels (thereby only requiring 12 samples)
+    // The normalizer for a 13x13 (that only uses 12 samples) is 1/2048
+    // The full kernel is [1, 11, 55, 165, 330, 462, 462, 330, 165, 55, 11, 1]
+    float edgeNormalizers13x13[6];
+    edgeNormalizers13x13[0] = 0.00048828125;
+    edgeNormalizers13x13[1] = 0.00537109375;
+    edgeNormalizers13x13[2] = 0.02685546875;
+    edgeNormalizers13x13[3] = 0.08056640625;
+    edgeNormalizers13x13[4] = 0.1611328125;
+    edgeNormalizers13x13[5] = 0.2255859375;
+    
+    // Have to get the offsets for the various texels (2.5, 3.5, 4.5, 5.5)
+    float offsetTwoAndHalf = halfInvResX * 5.;
+    float offsetThreeAndHalf = halfInvResX * 7.;
+    float offsetFourAndHalf = halfInvResX * 9.;
+    float offsetFiveAndHalf = halfInvResX * 11.;
+    
+    // Get the texels with offsets (-5.5, -4.5, -3.5, -2.5, -1.5, -.5, .5, 1.5, 2.5, 3.5, 4.5, 5.5)
+    color4 color = getColorNormalized(vec2(uv.x - offsetFiveAndHalf, uv.y), iChannel0, edgeNormalizers13x13[0]);
+    color += getColorNormalized(vec2(uv.x - offsetFourAndHalf, uv.y), iChannel0, edgeNormalizers13x13[1]);
+    color += getColorNormalized(vec2(uv.x - offsetThreeAndHalf, uv.y), iChannel0, edgeNormalizers13x13[2]);
+    color += getColorNormalized(vec2(uv.x - offsetTwoAndHalf, uv.y), iChannel0, edgeNormalizers13x13[3]);
+    color += getColorNormalized(vec2(uv.x - offsetOneAndHalf, uv.y), iChannel0, edgeNormalizers13x13[4]);
+    color += getColorNormalized(vec2(uv.x - halfInvResX, uv.y), iChannel0, edgeNormalizers13x13[5]);
+    color += getColorNormalized(vec2(uv.x + halfInvResX, uv.y), iChannel0, edgeNormalizers13x13[5]);
+    color += getColorNormalized(vec2(uv.x + offsetOneAndHalf, uv.y), iChannel0, edgeNormalizers13x13[4]);
+	color += getColorNormalized(vec2(uv.x + offsetTwoAndHalf, uv.y), iChannel0, edgeNormalizers13x13[3]);
+    color += getColorNormalized(vec2(uv.x + offsetThreeAndHalf, uv.y), iChannel0, edgeNormalizers13x13[2]);
+	color += getColorNormalized(vec2(uv.x + offsetFourAndHalf, uv.y), iChannel0, edgeNormalizers13x13[1]);
+    color += getColorNormalized(vec2(uv.x + offsetFiveAndHalf, uv.y), iChannel0, edgeNormalizers13x13[0]);
+
+	return color;
+}
+
+
+// mainImage:
+// Calculates a lot of important variables like UV, half the texel distance, and gets a blur horizontally
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // UV for input texture
@@ -9,19 +91,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     float halfInvResX = (1.0 / iChannelResolution[0].x) * .5;
     float offsetOneAndHalf = 3. * halfInvResX;
     
-    // Doing a 5x5 kernel sampling from the edges of texels (thereby only requiring 4 samples)
-    // The normalizer for a 5x5 (that only uses 4 samples) is 1/8
-    // This is because the kernel is [1, 3, 3, 1]
-    float edgeNormalizer5x5 =  0.125; 	// Normalizer for the 1 in the kernel
-    float edgeNormalizer5x5mid = 0.375; // Normalizer for the 3 in the kernel
-    
-    // Get all the pixels with (-1.5, -0.5, 0.5, 1.5) offset 
-    // Use getColorNormalized (which is in the common tab)
-    color4 color5x5 = getColorNormalized(vec2(uv.x - (offsetOneAndHalf), uv.y) , iChannel0, edgeNormalizer5x5);
-    color5x5 += getColorNormalized(vec2(uv.x - halfInvResX, uv.y), iChannel0, edgeNormalizer5x5mid);
-    color5x5 += getColorNormalized(vec2(uv.x + halfInvResX, uv.y), iChannel0, edgeNormalizer5x5mid);
-    color5x5 += getColorNormalized(vec2(uv.x + (offsetOneAndHalf), uv.y), iChannel0, edgeNormalizer5x5);
+    color4 color5x5 = horizontalBlur5x5(uv, halfInvResX, offsetOneAndHalf);
     
     fragColor = color5x5;
+    
+    color4 color13x13 = horizontalBlur13x13(uv, halfInvResX, offsetOneAndHalf);
+    
+    fragColor = color13x13;
     
 }

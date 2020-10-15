@@ -1,5 +1,7 @@
 // GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
 //  -> COMMON TAB (shared with all other tabs)
+// Edited by: Colin Deane
+// Edit description: Added calcLuma and getColorNormalized function
 
 //------------------------------------------------------------
 // TYPE ALIASES & UTILITY FUNCTIONS
@@ -78,6 +80,16 @@ color4 getColorNormalized(in sCoord point, in sampler2D sampText, in float norma
 {
  	vec4 color = texture(sampText, point) * normalizer;   
     return color;
+}
+
+// calcLuma: Gets the luma of a color that is input
+//		color:	input color to get the brightness of
+//	Source for the luma values comes from David Wolff's GLSL 4.0 Cookbook
+//		Link: https://people.inf.elte.hu/plisaai/pdf/David%20Wolff%20-%20OpenGL%204.0%20Shading%20Language%20Cookbook%20(2).pdf
+//			Page number 166 (179 in PDF)
+float calcLuma(in color4 color)
+{
+ 	return 0.21 * color.r + 0.72 * color.g + 0.07 * color.b;   
 }
 
 //------------------------------------------------------------
@@ -181,36 +193,3 @@ void initRayOrtho(out sRay ray,
     // offset eye position to point on plane at the same depth
     initRayPersp(ray, eyePosition + sBasis(viewport.xy, 0.0), viewport);
 }
-
-
-//------------------------------------------------------------
-/*
-// GLSL FRAGMENT SHADER STRUCTURE WITH COMMON TAB
-//  -> This is (likely) how Shadertoy compiles buffer tabs:
-
-// latest version or whichever is used
-#version 300 es
-
-// PROGRAM UNIFORMS (see 'Shader Inputs' dropdown)
-
-// **CONTENTS OF COMMON TAB PASTED HERE**
-
-// **CONTENTS OF BUFFER TAB PASTED HERE**
-
-// FRAGMENT SHADER INPUTS (more on this later)
-
-// FRAGMENT SHADER OUTPUTS (framebuffer render target(s))
-//out vec4 rtFragColor; // no specific target
-layout (location = 0) out vec4 rtFragColor; // default
-
-void main()
-{
-    // Call 'mainImage' in actual shader main, which is 
-	// 	our prototyping interface for ease of use.
-	//		rtFragColor:  shader output passed by reference,
-	//			full vec4 read in 'mainImage' as 'fragColor'
-	//		gl_FragCoord: GLSL's built-in pixel coordinate,
-	//			vec2 part read in 'mainImage' as 'fragCoord'
-    mainImage(rtFragColor, gl_FragCoord.xy);
-}
-*/

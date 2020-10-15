@@ -1,8 +1,73 @@
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//		File name: Image
+//		Purpose: Perform a variety of compositing functions on the output of the other buffers
+//
 // GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
 //  -> IMAGE TAB (final)
 
 //------------------------------------------------------------
 // SHADERTOY MAIN
+
+// COMPOSITING FUNCTIONS
+
+// addition: adds the blur to the original
+//	original:	input original color (Buffer A)
+//	blur:		input blur color (Buffer C)	
+color4 addition(in color4 original, in color4 blur)
+{
+ 	return original + blur;   
+}
+
+// cMix: mixes the blur with the original
+//	original:	input original color (Buffer A)
+//	blur:		input blur color (Buffer C)
+color4 cMix(in color4 original, in color4 blur)
+{
+ 	return mix(original, blur, .1);   
+}
+
+// screen: Double inversion and multiplication
+//	original:	input original color (Buffer A)
+//	blur:		input blur color (Buffer C)
+// Source for screen function comes from Wikipedia
+//		Link: https://en.wikipedia.org/wiki/Blend_modes#Screen
+color4 screen(in color4 original, in color4 blur)
+{
+ 	return 1.0 - (1.0 - original) * (1.0 - blur);   
+}
+
+// overlay: overlay the original with the blur
+//	original:	input original color (Buffer A)
+//	blur:		input blur color (Buffer C)
+// Source for overlay function comes from Wikipedia
+//		Link: https://en.wikipedia.org/wiki/Blend_modes#Overlay
+color4 overlay(in color4 original, in color4 blur)
+{
+    float luma =  calcLuma(original);
+    if(luma < 0.5)
+    {
+    	return 2.0 * original * blur;    
+    }
+        
+ 	return 1.0 - 2.0 * (1.0 - original) * (1.0 - blur);   
+}
+
+// Edge detection
+color4 edgeDetection(in sCoord uv)
+{
+	return vec4(1.0);
+}
 
 // mainImage: process the current pixel (exactly one call per pixel)
 //    fragColor: output final color for current pixel
@@ -13,34 +78,13 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     // UV for input image
     sCoord uv = fragCoord / iChannelResolution[0].xy;
         
-    vec4 blur = texture(iChannel0, uv);
-    vec4 original = texture(iChannel1, uv);
+    color4 blur = texture(iChannel0, uv);
+    color4 original = texture(iChannel1, uv);
     
     // COMPOSITE COLORS
     
-    vec4 m = mix(original, blur, .1);
-    fragColor = m;
-    
-    // Add the original and the blur together
-    fragColor = original + blur;
-    
-    fragColor = 1. - (1. - original) * (1. - blur);
-    
-    //fragColor = original;
+    fragColor = addition(original, blur);
+    fragColor = cMix(original, blur);
+    fragColor = screen(original, blur);
+    //fragColor = overlay(original, blur);
 }
-
-// Bonuses
-// Do the blur in multiple passes
-// Break the blur into a horizontal and vertical pass
-// In the example of a 3x3 kernal, it is a product of 2 1x3 kernals
-// Add Buffer D samples from Buffer C (which is horizontally blurred)
-// Order doesnt matter for kernals
-
-// Sobel filter
-
-// Custom cubemap
-// Cubemap A tab
-// Write your own cubemap and sample from that
-
-// Sound
-// Get a function with a respect to time and you can read that in
