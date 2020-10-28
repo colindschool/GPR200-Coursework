@@ -1,0 +1,91 @@
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//		File name: Buffer A
+//		Purpose: Generate FBM noise from a default Shadertoy noise function
+//
+// GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
+//  -> BUFFER A TAB (scene)
+
+//------------------------------------------------------------
+// NOISE FUNCTIONS
+
+// noise: Generate value noise from a noise texture (returns a value from 0 to 1)
+//		in vec3 v: The vector used for sampling
+//		vec3 p: the floored vector of the input vector
+//		vec3 f: the fractional vector of the input vector
+//
+// Most of the implementation of this function comes from Inigo Quilez
+// Source: https://www.shadertoy.com/view/4sS3zG
+float noise(in vec2 v)
+{
+	vec2 p = floor(v);
+    vec2 f = fract(v);
+    // Perform the smoothstep function manually
+	f = f*f*(3.-2.*f);
+    // Calculate a place to sample from based on the xy
+    // Add the smoothstepped fractional vector
+	vec2 uv = (p+vec2(16.,64.)) + f;
+    // Get the red/green part of the texture to convert to 2D.
+	vec2 rg = texture( iChannel0, (uv+.5) * 0.00390625).xy;
+    // Return a mix of the redgreen components
+	return mix(rg.x, rg.y, 0.5);
+} 
+
+// fbm6: Calculate the Fractional Brownian Motion using 6 octaves
+// Additionally, move the point the noise is sampling at over time
+//
+// The numbers of this function come from programmersought.com
+// Source: https://www.programmersought.com/article/75884340325/
+
+// Matrix used for calculating displacement
+const mat2 mtx = mat2( 0.8,  0.60, -0.60,  0.80 );
+float fbm6( vec2 point ) {
+  float final = 0.0;
+  // Adjust the point that the noise is sampling over time
+  point += vec2(iTime *.5, 0.);
+  // Get the final color value over time by sampling the noise texture a lot
+  final += 0.500000*noise(point); point = mtx * point * 2.02; // Matrix multiplication of the point at the end here
+  final += 0.250000*noise(point); point = mtx * point * 2.03;
+  final += 0.125000*noise(point); point = mtx * point * 2.01;
+  final += 0.062500*noise(point); point = mtx * point * 2.04;
+  final += 0.031250*noise(point); point = mtx * point * 2.01;
+  final += 0.015625*noise(point);
+ 
+  return final * 1.03225806452;
+}
+
+//------------------------------------------------------------
+// SHADERTOY MAIN
+
+// mainImage: process the current pixel (exactly one call per pixel)
+//    fragColor: output final color for current pixel
+//    fragCoord: input location of current pixel in image (in pixels)
+void mainImage(out color4 fragColor, in sCoord fragCoord)
+{
+    // viewing plane (viewport) inputs
+    const sBasis eyePosition = sBasis(0.0);
+    const sScalar viewportHeight = 2.0, focalLength = 1.5;
+    
+    // viewport info
+    sViewport vp;
+
+    // ray
+    sRay ray;
+    
+    // render
+    initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
+    initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
+    //fragColor += calcColor(vp, ray, iChannel0, iTime);
+ 
+    fragColor = vec4(fbm6(ray.direction.xy * 2.));
+}
