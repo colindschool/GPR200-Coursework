@@ -85,7 +85,6 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     // render
     initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
     initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
-    //fragColor += calcColor(vp, ray, iChannel0, iTime);
  
     fragColor = vec4(fbm6(ray.direction.xy * 2.));
 }
