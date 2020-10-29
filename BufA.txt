@@ -70,6 +70,12 @@ float noise(in vec2 v)
 //  return final * 1.03225806452;
 //}
 
+struct Hit
+{
+ 	float hDist;
+  	bool isCube;  
+};
+
 float seaOctave(vec2 uv, float choppy)
 {
 	uv += noise(uv);
@@ -104,7 +110,12 @@ float seaHeight(vec3 p)
 
 float cubeSDF(vec3 p)
 {
- 	vec3 d = abs(p) - vec3(1.0);
+    float theta = radians(10.)+ iMouse.x * .005;
+    float cosTime = cos(theta);
+    float sinTime = sin(theta);
+    
+    vec3 rotP = p * mat3(cosTime, 0.0, -sinTime, 0.0, 1.0, 0.0, sinTime, 0.0, cosTime);
+ 	vec3 d = abs(vec3(rotP.x, rotP.y + .25 * cos(iTime) - 1.0, rotP.z)) - vec3(1.0);
     
     float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
     
@@ -182,7 +193,7 @@ float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
 vec3 lighting(vec3 p, vec3 eye, vec2 uv)
 {
  	PointLight light;
-    initLight(vec3(0.0, 4.0, 0.0), vec3(1.0), 100., light);
+    initLight(vec3(3.0, 4.0, 3.0), vec3(1.0), 100., light);
     vec3 n = estimateNormal(p, uv);
     
     vec3 distVec = light.center - p;
