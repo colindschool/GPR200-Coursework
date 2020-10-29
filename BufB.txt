@@ -13,12 +13,35 @@ float cubeSDF(vec3 p)
     
     return insideDistance + outsideDistance;
 }
-
+float seaOctave(vec2 uv, float choppy)
+{
+	uv = texture(iChannel0, uv).rr;
+    vec2 wv = 1.0-abs(sin(uv));
+    vec2 swv = abs(cos(uv));
+    wv = mix(wv, swv, wv);
+    return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
+}
+const mat2 mtx = mat2( 0.8,  0.60, -0.60,  0.80 );
 float planeSDF(vec3 p, vec2 uv)
 {
+    float frequency = .16;
+    float amplitude = .6;
+    float choppy = 4.0;
+    vec2 pd = p.xz;
+    
+    float d, h =0.0;
+    for(int i = 0; i < 3; i++)
+    {
+        d = seaOctave(uv * frequency, choppy);  
+        h += d * amplitude;
+    	uv *= mtx;
+        frequency *= 1.9;
+        amplitude *= 0.22;
+        choppy = mix(choppy, 1.0, 0.2);
+    }
     vec4 c = texture(iChannel0, uv);
  	//return dot(p, normalize(vec3(0.0, 1.0, 0.0))) + 25. + c.r;
-    return p.y + c.r;
+    return p.y - h;
 }
 
 float sphereSDF(vec3 p)
@@ -28,7 +51,8 @@ float sphereSDF(vec3 p)
 
 float sceneSDF(vec3 samplePoint, vec2 uv)
 {
- 	return min(sphereSDF(samplePoint), planeSDF(samplePoint, uv));   
+    float m = min(sphereSDF(samplePoint), cubeSDF(samplePoint));
+ 	return min(m, planeSDF(samplePoint, uv));   
 }
 
 float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, float end, vec2 uv)
@@ -50,13 +74,6 @@ float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, f
     return end;
 }
 
-vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
-{
- 	vec2 xy = fragCoord - size * 0.5;
-    float z = size.y / tan(radians(fieldOfView) * 0.5);
-    return normalize(vec3(xy, -z));
-}
-
 vec3 estimateNormal(vec3 p, vec2 uv)
 {
  	return normalize(vec3(
@@ -66,41 +83,69 @@ vec3 estimateNormal(vec3 p, vec2 uv)
     ));
 }
 
-vec3 phongContribForLight(vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye, vec3 lightPos, vec3 lightIntensity, vec2 uv)
+// Structure for a PointLight
+struct PointLight
 {
- 	vec3 N = estimateNormal(p, uv);
-    vec3 L = normalize(lightPos - p);
-    vec3 V = normalize(eye - p);
-    vec3 R = normalize(reflect(-L, N));
+	vec3 center; // Location of light source
+    vec3 color;	 // The color of the light
+    float lIntensity; // The intensity of the light
     
-    float dotLN = dot(L, N);
-    float dotRV = dot(R, V);
-    
-    if(dotLN < 0.0)
-    {
-     	return vec3(0.0, 0.0, 0.0);   
-    }
-    
-    if(dotRV < 0.0)
-    {
-     	return lightIntensity * (k_d * dotLN);   
-    }
-    return lightIntensity * (k_d * dotLN + k_s * pow(dotRV, alpha));
+};
+
+// Initialize a PointLight structure
+void initLight(in vec3 center, in vec3 color, in float intensity,
+               out PointLight light)
+{
+    light.center = center;			// Center of the light
+    light.color = color;			// Color of the light
+    light.lIntensity = intensity;	// Intensity of the light
+      
 }
 
-vec3 phongIllumination(vec3 k_a, vec3 k_d, vec3 k_s, float alpha, vec3 p, vec3 eye, vec2 uv)
+float lBlinnPhong(vec3 eye, vec3 p, vec3 lv, vec3 n)
 {
- 	const vec3 ambientLight = 0.5 * vec3(1.0, 1.0, 1.0);
-    vec3 color = ambientLight * k_a;
+    vec3 viewVector = normalize(eye - p);
+    vec3 halfwayVec = normalize(lv + viewVector);
     
-    vec3 light1Pos = vec3(4.0, 2.0, 4.0);
-    vec3 light1Intensity = vec3(0.4, 0.4, 0.4);
+    float specCo = max(0.0f, dot(n, halfwayVec));
+    float specInt = pow(specCo, 200.0);
+ 	return specInt;   
+}
+
+float lLambDifCoef(vec3 n, vec3 lv)
+{
+    float difCoef = max(0., dot(n, lv));
+ 	return difCoef;	   
+}
+
+float lLambAttenuation(PointLight light, float dist)
+{
+    float distIntensity = dist / light.lIntensity;
+    return 1. / (1. + distIntensity + (distIntensity * distIntensity));
+}
+
+float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
+{
+ 	return lLambDifCoef(n, lv) * lLambAttenuation(light, ld);   
+}
+
+vec3 lighting(vec3 p, vec3 eye, vec2 uv)
+{
+ 	PointLight light;
+    initLight(vec3(1.0, 2.0, 2.0), vec3(1.0), 100., light);
+    vec3 n = estimateNormal(p, uv);
     
-    color += phongContribForLight(k_d, k_s, alpha, p, eye, light1Pos, light1Intensity, uv);
-    vec3 light2Pos = vec3(2.0, 2.0, 2.0);
-    vec3 light2Intensity = vec3(0.4, 0.4, 0.4);
+    vec3 tempVec = light.center - p;
+    float tempFlt = dot(tempVec, tempVec);
+    float lightDist = sqrt(tempFlt);
+    vec3 lightVec = tempVec / lightDist;
     
-    color += phongContribForLight(k_d, k_s, alpha, p, eye, light2Pos, light2Intensity, uv);
+    float ID = lLambertian(light, p, n, lightVec, lightDist);
+    float IS = lBlinnPhong(eye, p, lightVec, n);
+    
+    vec3 ambience = vec3(0.2) * 0.5;
+    vec3 color = ambience + (ID * vec3(0.5, 0.0, 0.5) + IS * vec3(1.0)) * light.color;
+    
     return color;
 }
 
@@ -115,6 +160,13 @@ mat4 viewMatrix(vec3 eye, vec3 center, vec3 up)
         vec4(-f, 0.0),
         vec4(0.0, 0.0, 0.0, 1.0)
    	);
+}
+
+vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
+{
+ 	vec2 xy = fragCoord - size * 0.5;
+    float z = size.y / tan(radians(fieldOfView) * 0.5);
+    return normalize(vec3(xy, -z));
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
@@ -141,12 +193,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // The closest point on the surface to the eyepoint along the view ray;
     vec3 p = eye + dist * worldDir;
     
-    vec3 K_a = vec3(0.2, 0.2, 0.2);
-    vec3 K_d = vec3(0.7, 0.2, 0.2);
-    vec3 K_s = vec3(1.0, 1.0, 1.0);
-    float shininess = 10.0;
-    
-    vec3 color = phongIllumination(K_a, K_d, K_s, shininess, p, eye, uv);
-    
+    vec3 color = lighting(p, eye, uv);
     fragColor = vec4(color, 1.0);
 }
