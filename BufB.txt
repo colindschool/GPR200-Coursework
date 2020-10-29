@@ -23,7 +23,7 @@ float planeSDF(vec3 p, vec2 uv)
 
 float sphereSDF(vec3 p)
 {
- 	 return length(p + vec3(20.0, -5.0, 30.0)) - 1.0;
+ 	 return length(p + vec3(14, 5. * -iMouse.y / iResolution.y, 21.)) - 1.0;
 }
 
 float sceneSDF(vec3 samplePoint, vec2 uv)
@@ -133,6 +133,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     {
         vec3 normDir = normalize(worldDir);
         float blendAmount = 0.5 * (normDir.y + 1.0);
+        float mouseY = iMouse.y / iResolution.y;
      	fragColor = mix(vec4(1.0), vec4(0.2, 0.7, 1.0, 1.0), blendAmount);
         return;
     }
