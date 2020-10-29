@@ -132,13 +132,13 @@ float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
 vec3 lighting(vec3 p, vec3 eye, vec2 uv)
 {
  	PointLight light;
-    initLight(vec3(1.0, 2.0, 2.0), vec3(1.0), 100., light);
+    initLight(vec3(-14.0, 10.0, -21.0), vec3(1.0), 100., light);
     vec3 n = estimateNormal(p, uv);
     
-    vec3 tempVec = light.center - p;
-    float tempFlt = dot(tempVec, tempVec);
-    float lightDist = sqrt(tempFlt);
-    vec3 lightVec = tempVec / lightDist;
+    vec3 distVec = light.center - p;
+    float distVecSq = dot(distVec, distVec);
+    float lightDist = sqrt(distVecSq);
+    vec3 lightVec = distVec / lightDist;
     
     float ID = lLambertian(light, p, n, lightVec, lightDist);
     float IS = lBlinnPhong(eye, p, lightVec, n);
