@@ -232,6 +232,8 @@ float raymarch(in vec3 eye, in vec3 marchingDirection, in float start,
 }
 
 // estimateNormal: estimate the normal of a surface
+// Source of this comes from the Art of Code YouTube channel:
+//		Source link: https://youtu.be/PGtv-dBi2wE
 vec3 estimateNormal(in vec3 p, out Hit hit, in float time, in float mouseX)
 {
     // Normalize a surrounding area of the scene. Calculate the slope from that (and that is the normal)

@@ -10,12 +10,19 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 //
-//		File name: Image
-//		Purpose: Print out various buffers
+//		File name: Buffer B
+//		Purpose: Do some cel-shading for an after effect
 //
-
+// 	Cel-shading equation provided by Stina Bridgeman of Hobart and William Smith Colleges
+//		Source link: http://math.hws.edu/bridgeman/courses/424/f19/inclass/lab7.pdf
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{  
+{
+    // Calculate the UV
     vec2 uv = fragCoord / iResolution.xy;
-    fragColor = texture(iChannel1, uv);
+    // Sample from channel A
+    vec4 finalColor = texture(iChannel0, uv);
+    // Do cel shading
+    float steps = 15.0f;
+    finalColor = floor(finalColor * steps) / steps;
+    fragColor = finalColor;
 }
