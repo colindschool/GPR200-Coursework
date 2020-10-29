@@ -76,7 +76,7 @@ struct Hit
   	bool isCube;  
 };
 
-float seaOctave(vec2 uv, float choppy)
+float seaOctave(in vec2 uv, in float choppy)
 {
 	uv += noise(uv);
     vec2 wv = 1.0-abs(sin(uv));
@@ -85,7 +85,7 @@ float seaOctave(vec2 uv, float choppy)
     return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
 }
 
-float seaHeight(vec3 p)
+float seaHeight(in vec3 p)
 {
  	float freq = 0.4;
     float amp = 0.4;
@@ -108,7 +108,7 @@ float seaHeight(vec3 p)
     return p.y - h;
 }
 
-float cubeSDF(vec3 p)
+float cubeSDF(in vec3 p)
 {
     float theta = radians(10.)+ iMouse.x * .005;
     float cosTime = cos(theta);
@@ -124,42 +124,58 @@ float cubeSDF(vec3 p)
     return insideDistance + outsideDistance;
 }
 
-float sphereSDF(vec3 p)
+float sphereSDF(in vec3 p)
 {
  	 return length(p + vec3(14, 5. * -iMouse.y / iResolution.y, 21.)) - 1.0;
 }
 
-float sceneSDF(vec3 samplePoint, vec2 uv)
+float sceneSDF(in vec3 samplePoint, out Hit hit)
 {
     //float m = min(sphereSDF(samplePoint), cubeSDF(samplePoint));
- 	return min(cubeSDF(samplePoint), seaHeight(samplePoint));   
+    float c = cubeSDF(samplePoint);
+    float s = seaHeight(samplePoint);
+    
+    if(c <= s)
+    {
+       	hit.isCube = true;
+        return c;
+    }
+    else
+    {
+     	hit.isCube = false;
+        return s;
+    } 
 }
 
-float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, float end, vec2 uv)
+float shortestDistanceToSurface(in vec3 eye, in vec3 marchingDirection, in float start,
+                                in float end, out Hit hit)
 {
     float depth = start;
     for (int i = 0; i < MAX_MARCHING_STEPS; i++)
     {
-     	float dist = sceneSDF(eye + depth * marchingDirection, uv);
+     	float dist = sceneSDF(eye + depth * marchingDirection, hit);
         if(dist < EPSILON)
         {
+            hit.hDist = depth;
          	return depth;   
         }
         depth += dist;
         if (depth >= end)
         {
+            hit.hDist = end;
          	return end;   
         }
     }
+    hit.hDist = end;
     return end;
 }
 
-vec3 estimateNormal(vec3 p, vec2 uv)
+vec3 estimateNormal(vec3 p, out Hit hit)
 {
  	return normalize(vec3(
-        sceneSDF(vec3(p.x + EPSILON, p.y, p.z), uv) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z), uv),
-        sceneSDF(vec3(p.x, p.y + EPSILON, p.z), uv) - sceneSDF(vec3(p.x, p.y - EPSILON, p.z), uv),
-        sceneSDF(vec3(p.x, p.y, p.z  + EPSILON), uv) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON), uv)
+        sceneSDF(vec3(p.x + EPSILON, p.y, p.z), hit) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z), hit),
+        sceneSDF(vec3(p.x, p.y + EPSILON, p.z), hit) - sceneSDF(vec3(p.x, p.y - EPSILON, p.z), hit),
+        sceneSDF(vec3(p.x, p.y, p.z  + EPSILON), hit) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON), hit)
     ));
 }
 
@@ -190,11 +206,11 @@ float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
  	return lLambDifCoef(n, lv) * lLambAttenuation(light, ld);   
 }
 
-vec3 lighting(vec3 p, vec3 eye, vec2 uv)
+vec3 lighting(vec3 p, vec3 eye, vec2 uv, inout Hit hit)
 {
  	PointLight light;
     initLight(vec3(3.0, 4.0, 3.0), vec3(1.0), 100., light);
-    vec3 n = estimateNormal(p, uv);
+    vec3 n = estimateNormal(p, hit);
     
     vec3 distVec = light.center - p;
     float distVecSq = dot(distVec, distVec);
@@ -205,7 +221,16 @@ vec3 lighting(vec3 p, vec3 eye, vec2 uv)
     float IS = lBlinnPhong(eye, p, lightVec, n);
     
     vec3 ambience = vec3(0.2) * 0.5;
-    vec3 color = ambience + (ID * vec3(0.8, 0.9, 0.6)*.6 + IS * vec3(1.0)) * light.color;
+    vec3 surfaceColor = vec3(0.0, 0.62, 0.76);
+    if(hit.isCube)
+    {
+        uv *= 3.;
+        uv.x += .85;
+        uv.y += .5 + (.1 * cos(iTime));
+     	surfaceColor = vec3(texture(iChannel1, uv));   
+    }
+    
+    vec3 color = ambience + (ID * surfaceColor + IS * vec3(1.0)) * light.color;
     
     return color;
 }
@@ -263,20 +288,20 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     
     vec3 worldDir = (viewToWorld * vec4(viewDir, 0.0)).xyz;
     
-    float dist = shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST, uv);
+    Hit hit;
+    shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST, hit);
     
-    if(dist > MAX_DIST - EPSILON)
+    if(hit.hDist > MAX_DIST - EPSILON)
     {
         vec3 normDir = normalize(worldDir);
         float blendAmount = 0.5 * (normDir.y + 1.0);
-        float mouseY = iMouse.y / iResolution.y;
      	fragColor = mix(vec4(1.0), vec4(0.2, 0.7, 1.0, 1.0), blendAmount);
         return;
     }
     
     // The closest point on the surface to the eyepoint along the view ray;
-    vec3 p = eye + dist * worldDir;
+    vec3 p = eye + hit.hDist * worldDir;
     
-    vec3 color = lighting(p, eye, uv);
+    vec3 color = lighting(p, eye, uv, hit);
     fragColor = vec4(color, 1.0);
 }
