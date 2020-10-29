@@ -16,6 +16,12 @@
 // GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
 //  -> BUFFER A TAB (scene)
 
+const int MAX_MARCHING_STEPS = 255;
+const float MIN_DIST = 0.0;
+const float MAX_DIST = 100.0;
+const float EPSILON = 0.01;
+const mat2 octave_m = mat2(1.6,1.2,-1.2,1.6);
+
 //------------------------------------------------------------
 // NOISE FUNCTIONS
 
@@ -41,6 +47,7 @@ float noise(in vec2 v)
 	return mix(rg.x, rg.y, 0.5);
 } 
 
+// OLD:
 // fbm6: Calculate the Fractional Brownian Motion using 6 octaves
 // Additionally, move the point the noise is sampling at over time
 //
@@ -48,21 +55,170 @@ float noise(in vec2 v)
 // Source: https://www.programmersought.com/article/75884340325/
 
 // Matrix used for calculating displacement
-const mat2 mtx = mat2( 0.8,  0.60, -0.60,  0.80 );
-float fbm6( vec2 point ) {
-  float final = 0.0;
-  // Adjust the point that the noise is sampling over time
-  point += vec2(iTime *.5, 0.);
-  // Get the final color value over time by sampling the noise texture a lot
-  final += 0.500000*noise(point); point = mtx * point * 2.02; // Matrix multiplication of the point at the end here
-  final += 0.250000*noise(point); point = mtx * point * 2.03;
-  final += 0.125000*noise(point); point = mtx * point * 2.01;
-  final += 0.062500*noise(point); point = mtx * point * 2.04;
-  final += 0.031250*noise(point); point = mtx * point * 2.01;
-  final += 0.015625*noise(point);
- 
-  return final * 1.03225806452;
+//const mat2 mtx = mat2( 0.8,  0.60, -0.60,  0.80 );
+//float fbm6( vec2 point ) {
+//  float final = 0.0;
+//  // Adjust the point that the noise is sampling over time
+//  point += vec2(iTime *.5, 0.);
+//  // Get the final color value over time by sampling the noise texture a lot
+//  final += 0.500000*noise(point); point = mtx * point * 2.02; // Matrix multiplication of the point at the end here
+//  final += 0.250000*noise(point); point = mtx * point * 2.03;
+//  final += 0.125000*noise(point); point = mtx * point * 2.01;
+//  final += 0.062500*noise(point); point = mtx * point * 2.04;
+//  final += 0.031250*noise(point); point = mtx * point * 2.01;
+//  final += 0.015625*noise(point);
+//  return final * 1.03225806452;
+//}
+
+float seaOctave(vec2 uv, float choppy)
+{
+	uv += noise(uv);
+    vec2 wv = 1.0-abs(sin(uv));
+    vec2 swv = abs(cos(uv));
+    wv = mix(wv, swv, wv);
+    return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
 }
+
+float seaHeight(vec3 p)
+{
+ 	float freq = 0.4;
+    float amp = 0.4;
+    float choppy = 4.0;
+    vec2 uv = p.xz;
+    uv.x *= 0.75;
+    
+    float seaTime = iTime * 0.8;
+    float d, h = 0.0;
+    for(int i = 0; i < 3; i++)
+    {
+     	d = seaOctave((uv+seaTime) * freq, choppy);
+        d += seaOctave((uv-seaTime) * freq, choppy);
+        h += d * amp;
+        uv *= octave_m;
+        freq *= 1.9;
+        amp *= 0.22;
+        choppy = mix(choppy, 1.0, 0.2);
+    }
+    return p.y - h;
+}
+
+float cubeSDF(vec3 p)
+{
+ 	vec3 d = abs(p) - vec3(1.0);
+    
+    float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
+    
+    float outsideDistance = length(max(d, 0.0));
+    
+    return insideDistance + outsideDistance;
+}
+
+float sphereSDF(vec3 p)
+{
+ 	 return length(p + vec3(14, 5. * -iMouse.y / iResolution.y, 21.)) - 1.0;
+}
+
+float sceneSDF(vec3 samplePoint, vec2 uv)
+{
+    //float m = min(sphereSDF(samplePoint), cubeSDF(samplePoint));
+ 	return min(cubeSDF(samplePoint), seaHeight(samplePoint));   
+}
+
+float shortestDistanceToSurface(vec3 eye, vec3 marchingDirection, float start, float end, vec2 uv)
+{
+    float depth = start;
+    for (int i = 0; i < MAX_MARCHING_STEPS; i++)
+    {
+     	float dist = sceneSDF(eye + depth * marchingDirection, uv);
+        if(dist < EPSILON)
+        {
+         	return depth;   
+        }
+        depth += dist;
+        if (depth >= end)
+        {
+         	return end;   
+        }
+    }
+    return end;
+}
+
+vec3 estimateNormal(vec3 p, vec2 uv)
+{
+ 	return normalize(vec3(
+        sceneSDF(vec3(p.x + EPSILON, p.y, p.z), uv) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z), uv),
+        sceneSDF(vec3(p.x, p.y + EPSILON, p.z), uv) - sceneSDF(vec3(p.x, p.y - EPSILON, p.z), uv),
+        sceneSDF(vec3(p.x, p.y, p.z  + EPSILON), uv) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON), uv)
+    ));
+}
+
+float lBlinnPhong(vec3 eye, vec3 p, vec3 lv, vec3 n)
+{
+    vec3 viewVector = normalize(eye - p);
+    vec3 halfwayVec = normalize(lv + viewVector);
+    
+    float specCo = max(0.0f, dot(n, halfwayVec));
+    float specInt = pow(specCo, 200.0);
+ 	return specInt;   
+}
+
+float lLambDifCoef(vec3 n, vec3 lv)
+{
+    float difCoef = max(0., dot(n, lv));
+ 	return difCoef;	   
+}
+
+float lLambAttenuation(PointLight light, float dist)
+{
+    float distIntensity = dist / light.lIntensity;
+    return 1. / (1. + distIntensity + (distIntensity * distIntensity));
+}
+
+float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
+{
+ 	return lLambDifCoef(n, lv) * lLambAttenuation(light, ld);   
+}
+
+vec3 lighting(vec3 p, vec3 eye, vec2 uv)
+{
+ 	PointLight light;
+    initLight(vec3(0.0, 4.0, 0.0), vec3(1.0), 100., light);
+    vec3 n = estimateNormal(p, uv);
+    
+    vec3 distVec = light.center - p;
+    float distVecSq = dot(distVec, distVec);
+    float lightDist = sqrt(distVecSq);
+    vec3 lightVec = distVec / lightDist;
+    
+    float ID = lLambertian(light, p, n, lightVec, lightDist);
+    float IS = lBlinnPhong(eye, p, lightVec, n);
+    
+    vec3 ambience = vec3(0.2) * 0.5;
+    vec3 color = ambience + (ID * vec3(0.8, 0.9, 0.6)*.6 + IS * vec3(1.0)) * light.color;
+    
+    return color;
+}
+
+mat4 viewMatrix(vec3 eye, vec3 center, vec3 up)
+{
+ 	vec3 f = normalize(center - eye);
+    vec3 s = normalize(cross(f, up));
+    vec3 u = cross(s, f);
+    return mat4(
+    	vec4(s, 0.0),
+        vec4(u, 0.0),
+        vec4(-f, 0.0),
+        vec4(0.0, 0.0, 0.0, 1.0)
+   	);
+}
+
+vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
+{
+ 	vec2 xy = fragCoord - size * 0.5;
+    float z = size.y / tan(radians(fieldOfView) * 0.5);
+    return normalize(vec3(xy, -z));
+}
+
 
 //------------------------------------------------------------
 // SHADERTOY MAIN
@@ -86,5 +242,30 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
     initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
  
-    fragColor = vec4(fbm6(ray.direction.xy * 2.));
+    //fragColor = vec4(fbm6(ray.direction.xy * 2.));
+    
+    vec2 uv = fragCoord / iResolution.xy;
+    vec3 viewDir = rayDirection(45.0, iResolution.xy, fragCoord);
+    vec3 eye = vec3(10.0, 5.0, 14.0);
+    
+    mat4 viewToWorld = viewMatrix(eye, vec3(0.0), vec3(0.0, 1.0, 0.0));
+    
+    vec3 worldDir = (viewToWorld * vec4(viewDir, 0.0)).xyz;
+    
+    float dist = shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST, uv);
+    
+    if(dist > MAX_DIST - EPSILON)
+    {
+        vec3 normDir = normalize(worldDir);
+        float blendAmount = 0.5 * (normDir.y + 1.0);
+        float mouseY = iMouse.y / iResolution.y;
+     	fragColor = mix(vec4(1.0), vec4(0.2, 0.7, 1.0, 1.0), blendAmount);
+        return;
+    }
+    
+    // The closest point on the surface to the eyepoint along the view ray;
+    vec3 p = eye + dist * worldDir;
+    
+    vec3 color = lighting(p, eye, uv);
+    fragColor = vec4(color, 1.0);
 }
