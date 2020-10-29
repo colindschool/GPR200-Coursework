@@ -164,7 +164,7 @@ void initViewport(out sViewport vp,
 struct sRay
 {
     sPoint origin;
-    sVector direction;
+    sBasis direction;
 };
 
 // initRayPersp: initialize perspective ray
@@ -172,24 +172,67 @@ struct sRay
 //    eyePosition: position of viewer in scene
 //    viewport:    input viewing plane offset
 void initRayPersp(out sRay ray,
-             	  in sBasis eyePosition, in sBasis viewport)
+             	  in sBasis eyePosition, in sBasis viewport, in float fieldOfView, 
+                  in vec2 size, in vec2 fragCoord )
 {
     // ray origin relative to viewer is the origin
     // w = 1 because it represents a point; can ignore when using
     ray.origin = asPoint(eyePosition);
 
-    // ray direction relative to origin is based on viewing plane coordinate
-    // w = 0 because it represents a direction; can ignore when using
-    ray.direction = asVector(viewport - eyePosition);
+    vec2 xy = fragCoord - size * 0.5;
+    float z = size.y / tan(radians(fieldOfView) * 0.5);
+    ray.direction = normalize(vec3(xy, -z));
 }
 
 // initRayOrtho: initialize orthographic ray
 //    ray: 		   output ray
 //    eyePosition: position of viewer in scene
 //    viewport:    input viewing plane offset
-void initRayOrtho(out sRay ray,
-             	  in sBasis eyePosition, in sBasis viewport)
-{
+//void initRayOrtho(out sRay ray,
+//             	  in sBasis eyePosition, in sBasis viewport)
+//{
     // offset eye position to point on plane at the same depth
-    initRayPersp(ray, eyePosition + sBasis(viewport.xy, 0.0), viewport);
+//    initRayPersp(ray, eyePosition + sBasis(viewport.xy, 0.0), viewport);
+//}
+
+// viewMatrix creates a matrix to convert from the camera to the world
+mat4 viewMatrix(vec3 eye, vec3 center, vec3 up)
+{
+ 	vec3 f = normalize(center - eye);
+    vec3 s = normalize(cross(f, up));
+    vec3 u = cross(s, f);
+    return mat4(
+    	vec4(s, 0.0),
+        vec4(u, 0.0),
+        vec4(-f, 0.0),
+        vec4(0.0, 0.0, 0.0, 1.0)
+   	);
 }
+
+// Structure for a PointLight
+struct PointLight
+{
+	vec3 center; // Location of light source
+    vec3 color;	 // The color of the light
+    float lIntensity; // The intensity of the light
+    
+};
+
+// Initialize a PointLight structure
+void initLight(in vec3 center, in vec3 color, in float intensity,
+               out PointLight light)
+{
+    light.center = center;			// Center of the light
+    light.color = color;			// Color of the light
+    light.lIntensity = intensity;	// Intensity of the light
+      
+}
+
+// Structure for a Hit
+//		hDist: the distance from the hit
+//		isCube: did the ray hit a cube?
+struct Hit
+{
+ 	float hDist;
+  	bool isCube;  
+};

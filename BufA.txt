@@ -11,11 +11,13 @@
 //   limitations under the License.
 //
 //		File name: Buffer A
-//		Purpose: Generate FBM noise from a default Shadertoy noise function
+//		Purpose: The bulk of my shader. Do raymarching and generate waves based on noise / FBM.
+//		Additionally, do the lighting of both the cube and the waves.
 //
 // GLSL STARTER CODE BY DANIEL S. BUCKSTEIN
 //  -> BUFFER A TAB (scene)
 
+// CONSTANTS NEEDED FOR THE WAVES
 const int MAX_MARCHING_STEPS = 255;
 const float MIN_DIST = 0.0;
 const float MAX_DIST = 100.0;
@@ -70,53 +72,90 @@ float noise(in vec2 v)
 //  return final * 1.03225806452;
 //}
 
-struct Hit
-{
- 	float hDist;
-  	bool isCube;  
-};
+//------------------------------------------------------------
+// SEA FUNCTIONS
+// ALL OF THE FOLLOWING FUNCTIONS WERE DERIVED FROM Alexander Alekseev (TDM)
+//		"Seascape"
+//		Source link: https://www.shadertoy.com/view/Ms2SD1
 
+// seaOctave: part of fbm calculations.
+//		uv: the uv coordinate that is turned into sound
+//		choppy: how choppy the sea is
+//	Optimized by: Colin Deane
 float seaOctave(in vec2 uv, in float choppy)
 {
 	uv += noise(uv);
-    vec2 wv = 1.0-abs(sin(uv));
-    vec2 swv = abs(cos(uv));
-    wv = mix(wv, swv, wv);
-    return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
+    // Generate a sin curve based on uv
+    vec2 swv = sin(uv);
+    vec2 wv = 1.0 - (swv * swv);
+    return pow(1.0 - (wv.x * wv.y), choppy);
+    
+    // OLD:
+   	// uv += noise(uv);
+    // vec2 wv = 1.0-abs(sin(uv));
+    // vec2 swv = abs(cos(uv));
+    // wv = mix(wv, swv, wv);
+    // return pow(1.0 - pow(wv.x * wv.y, 0.65), choppy);
 }
 
-float seaHeight(in vec3 p)
+// seaHeight: calculate the height of waves when raymarching.
+//	Basically, a modified version of a SDF plane
+//		vec3 p: the point at which to sample
+float seaHeight(in vec3 p, in float time)
 {
- 	float freq = 0.4;
-    float amp = 0.4;
-    float choppy = 4.0;
+ 	// WAVE DATA
+ 	float freq = 0.4;	// Frequency of the waves
+    float amp = 0.4;	// Amplitude of the waves
+    float choppy = 5.0;	// How choppy the waves are
+    // Establish some uv coordinates at the point's x & z coordinates.
+    // These will be manipulated
     vec2 uv = p.xz;
     uv.x *= 0.75;
     
-    float seaTime = iTime * 0.8;
+    float seaTime = time * 0.8;
     float d, h = 0.0;
-    for(int i = 0; i < 3; i++)
+    // OLD FOR LOOP: for(int i = 0; i < 3; i++)
+    // Loop that basically performs FBM on a wave to displace it
+    for(int i = 3; i > 0; --i)
     {
      	d = seaOctave((uv+seaTime) * freq, choppy);
         d += seaOctave((uv-seaTime) * freq, choppy);
         h += d * amp;
+        // Multiply the uv by an octave matrix (seen above)
         uv *= octave_m;
+        // Double the frequency, slash the amplitude into a 5th of what it was.
+        // This is for gradual, realistic waves
         freq *= 1.9;
         amp *= 0.22;
         choppy = mix(choppy, 1.0, 0.2);
     }
+    // Plane SDF function
     return p.y - h;
 }
 
-float cubeSDF(in vec3 p)
+//------------------------------------------------------------
+// RAYMARCHING / DISTANCE FUNCTIONS
+//
+// The base for these functions come from Inigo Quilez's page on SDF
+//		Source link: https://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+
+// cubeSDF: Contains the function for calculating the distance from a cube.
+//		I edited it to rotate with the x and to bob up and down with the water
+//		p: point to sample at
+float cubeSDF(in vec3 p, in float mouseX)
 {
-    float theta = radians(10.)+ iMouse.x * .005;
-    float cosTime = cos(theta);
-    float sinTime = sin(theta);
+    // Get a theta from mouse.x input
+    float theta = radians(10.)+ mouseX * .005;
+    // Get the cos and sin of that for a rotation matrix
+    float cosTheta = cos(theta);
+    float sinTheta = sin(theta);
     
-    vec3 rotP = p * mat3(cosTime, 0.0, -sinTime, 0.0, 1.0, 0.0, sinTime, 0.0, cosTime);
- 	vec3 d = abs(vec3(rotP.x, rotP.y + .25 * cos(iTime) - 1.0, rotP.z)) - vec3(1.0);
+    // Multiply the point by a rotation matrix, resulting in rotP
+    vec3 rotP = p * mat3(cosTheta, 0.0, -sinTheta, 0.0, 1.0, 0.0, sinTheta, 0.0, cosTheta);
+    // d is where the bobbing up and down is implemented
+ 	vec3 d = abs(vec3(rotP.x, rotP.y + .25 * cos(iTime) - .5, rotP.z)) - vec3(1.0);
     
+    // Get the distance from the inside and outside
     float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
     
     float outsideDistance = length(max(d, 0.0));
@@ -124,137 +163,212 @@ float cubeSDF(in vec3 p)
     return insideDistance + outsideDistance;
 }
 
-float sphereSDF(in vec3 p)
+// UNUSED:
+// sphereSDF: Has a sphere that changes based on the y of the mouse.
+//		p: the point at which to sample at
+//		mouseY: the y value of the mouse
+//		vp: the viewport, used to calculate the mouse Y variable
+float sphereSDF(in vec3 p, in float mouseY, in sViewport vp)
 {
- 	 return length(p + vec3(14, 5. * -iMouse.y / iResolution.y, 21.)) - 1.0;
+     // The sphere is positioned pretty far back
+ 	 return length(p + vec3(14, 5. * -mouseY * vp.resolutionInv.y, 21.)) - 1.0;
 }
 
-float sceneSDF(in vec3 samplePoint, out Hit hit)
+// sceneSDF: calculates the SDF for the entire scene.
+//		samplePoint: the point at which to sample at
+//		hit: a hit record to record if the cube or the waves got hit
+float sceneSDF(in vec3 samplePoint, out Hit hit, in float time, in float mouseX)
 {
+    // OLD:
     //float m = min(sphereSDF(samplePoint), cubeSDF(samplePoint));
-    float c = cubeSDF(samplePoint);
-    float s = seaHeight(samplePoint);
+    // Calculate the cubeSDF and the planeSDF (seaHeight)
+    float c = cubeSDF(samplePoint, mouseX);
+    float s = seaHeight(samplePoint, time);
     
-    if(c <= s)
+    // If the distance to the plane is less than the cube
+    if(s <= c)
     {
-       	hit.isCube = true;
-        return c;
-    }
-    else
-    {
-     	hit.isCube = false;
+        // DID NOT hit the cube
+       	hit.isCube = false;
         return s;
+    }
+    else // HIT the cube
+    {
+     	hit.isCube = true;
+        return c;
     } 
 }
 
-float shortestDistanceToSurface(in vec3 eye, in vec3 marchingDirection, in float start,
-                                in float end, out Hit hit)
+// raymarch: finds the closest object in the scene by distance
+float raymarch(in vec3 eye, in vec3 marchingDirection, in float start,
+                                in float end, out Hit hit, in float time, in float mouseX)
 {
     float depth = start;
-    for (int i = 0; i < MAX_MARCHING_STEPS; i++)
+    // OLD FOR LOOP: for(int i = 0; i < MAX_MARCHING_STEPS; i++)
+    // Do the marching!
+    for (int i = MAX_MARCHING_STEPS; i > 0; --i)
     {
-     	float dist = sceneSDF(eye + depth * marchingDirection, hit);
+        // Calculate the distance to the closest object!
+     	float dist = sceneSDF(eye + depth * marchingDirection, hit, time, mouseX);
+        // Is it less than the epsilon?
         if(dist < EPSILON)
         {
+            // The ray is close enough to an object
             hit.hDist = depth;
          	return depth;   
         }
+        // Otherwise, move along the ray according to the calculated distance
         depth += dist;
+        // The ray went too far
         if (depth >= end)
         {
             hit.hDist = end;
          	return end;   
         }
     }
+    // The ray took too many steps and did not collide with anything
     hit.hDist = end;
     return end;
 }
 
-vec3 estimateNormal(vec3 p, out Hit hit)
+// estimateNormal: estimate the normal of a surface
+vec3 estimateNormal(in vec3 p, out Hit hit, in float time, in float mouseX)
 {
+    // Normalize a surrounding area of the scene. Calculate the slope from that (and that is the normal)
  	return normalize(vec3(
-        sceneSDF(vec3(p.x + EPSILON, p.y, p.z), hit) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z), hit),
-        sceneSDF(vec3(p.x, p.y + EPSILON, p.z), hit) - sceneSDF(vec3(p.x, p.y - EPSILON, p.z), hit),
-        sceneSDF(vec3(p.x, p.y, p.z  + EPSILON), hit) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON), hit)
+        sceneSDF(vec3(p.x + EPSILON, p.y, p.z), hit, time, mouseX) - sceneSDF(vec3(p.x - EPSILON, p.y, p.z), hit, time, mouseX),
+        sceneSDF(vec3(p.x, p.y + EPSILON, p.z), hit, time, mouseX) - sceneSDF(vec3(p.x, p.y - EPSILON, p.z), hit, time, mouseX),
+        sceneSDF(vec3(p.x, p.y, p.z  + EPSILON), hit, time, mouseX) - sceneSDF(vec3(p.x, p.y, p.z - EPSILON), hit, time, mouseX)
     ));
 }
 
+//------------------------------------------------------------
+// LIGHTING FUNCTIONS
+
+// lBlinnPhong: Blinn-Phong reflectance
+//		eye: the position of the camera
+//		p: the point at which Blinn-Phong reflectance is being calculated for
+//		lv: the normalized light vector
+//		n: the normalized normal
 float lBlinnPhong(vec3 eye, vec3 p, vec3 lv, vec3 n)
 {
+    // Calculate the view and halway vector
     vec3 viewVector = normalize(eye - p);
     vec3 halfwayVec = normalize(lv + viewVector);
     
+    // Use the specular coefficient to calculate the specular intensity
     float specCo = max(0.0f, dot(n, halfwayVec));
     float specInt = pow(specCo, 200.0);
  	return specInt;   
 }
 
+// lLambDifCoef: Calculates the diffuse coefficient for Lambertian shading
+//		n: the normalized normal
+//		lv: the normalized light vector
 float lLambDifCoef(vec3 n, vec3 lv)
 {
     float difCoef = max(0., dot(n, lv));
  	return difCoef;	   
 }
 
+// lLambAttenuation: Calculates the attenuation of a light
+//		light: the PointLight structure that holds the light
+//		dist: the distance from the light
 float lLambAttenuation(PointLight light, float dist)
 {
+    // (distance over light intensity)
     float distIntensity = dist / light.lIntensity;
     return 1. / (1. + distIntensity + (distIntensity * distIntensity));
 }
 
+// lLambertian: Lambertian shading
+//		light: the PointLight structure that holds the light
+//		p: the point at which to do shading
+//		n: the normalized normal
+//		lv: the normalized light vector
+//		ld: the distance to the light
 float lLambertian(PointLight light, vec3 p, vec3 n, vec3 lv, float ld)
 {
  	return lLambDifCoef(n, lv) * lLambAttenuation(light, ld);   
 }
 
-vec3 lighting(vec3 p, vec3 eye, vec2 uv, inout Hit hit)
+// getSkyColor: Gets the color of the sky. Mainly used in the reflection of water
+//		e: the vector to calculate the color from. e.y is the only one used
+vec3 getSkyColor(vec3 e)
 {
+ 	e.y = (max(e.y,0.0)*0.2+0.4)*0.8;
+    float oneMinus = 1.0 - e.y;
+    return vec3(oneMinus * oneMinus, oneMinus, 0.6+ oneMinus *0.4) * 1.1;
+    //OLD:
+    // e.y = (max(e.y,0.0)*0.8+0.2)*0.8;
+    // return vec3(pow(1.0-e.y,2.0), 1.0-e.y, 0.6+(1.0-e.y)*0.4) * 1.1;
+}
+
+// lighting: The general lighting function that generates light for the cube and waves
+//		p: the position to get lighting at
+//		eye: the position of the eye of the camera
+//		uv: the uv coordinates that range from [0-1]
+//		hit: the hit result from the raymarching function
+//		video: the video of mr. Van Damme to be sampled from
+vec3 lighting(in vec3 p, in vec3 eye, in vec2 uv, inout Hit hit, in sampler2D video, in float time, in float mouseX)
+{
+    // Construct a point light
  	PointLight light;
-    initLight(vec3(3.0, 4.0, 3.0), vec3(1.0), 100., light);
-    vec3 n = estimateNormal(p, hit);
+    // Initialize the light pretty close to the camera
+    initLight(vec3(2.0, 4.0, 3.0), vec3(1.0), 1000., light);
     
+    // Estimate the normal
+    vec3 n = estimateNormal(p, hit, time, mouseX);
+    // Calculate some temporary variables that will be reused
     vec3 distVec = light.center - p;
     float distVecSq = dot(distVec, distVec);
-    float lightDist = sqrt(distVecSq);
-    vec3 lightVec = distVec / lightDist;
+    float lightDist = sqrt(distVecSq);		// the distance from the light to the point
+    vec3 lightVec = distVec / lightDist;	// the normalized vector of the light
     
+    // Calculate the Lambertian and BlinnPhong reflectance
     float ID = lLambertian(light, p, n, lightVec, lightDist);
     float IS = lBlinnPhong(eye, p, lightVec, n);
+    // Set the base color to the ambience
+    vec3 ambience = vec3(0.3) * 0.5;
+    vec3 color = ambience;
     
-    vec3 ambience = vec3(0.2) * 0.5;
-    vec3 surfaceColor = vec3(0.0, 0.62, 0.76);
-    if(hit.isCube)
+    // IF THE RAY HIT THE WAVES
+    if(hit.isCube == false)
     {
-        uv *= 3.;
-        uv.x += .85;
-        uv.y += .5 + (.1 * cos(iTime));
-     	surfaceColor = vec3(texture(iChannel1, uv));   
+        //  Create a water color = surface color
+        vec3 waterColor = vec3(0.48, 0.54, 0.36);
+        // Fresnel shading to get the light facing toward the camera
+        float fresnel = clamp(1.0 - dot(n, -eye), 0.0, 1.0);
+        // Cube it
+        fresnel *=  fresnel * fresnel * 0.3;
+        // Get the reflected sky color
+        vec3 reflected = getSkyColor(reflect(eye, n));
+        // Get the refracted color based on the attenuation
+        vec3 refracted = vec3(0.0,0.1,0.18) + ID * waterColor * .13;
+
+        // Mix the refracted and reflected value based on fresnel value
+        color = mix(refracted, reflected, fresnel);
+        // Add the BlinnPhong value
+        color += IS;
+        // Add the water color * the height of the plane
+        color += waterColor * (p.y - .5) * .18;
+        // RETURN THIS COLOR FOR THE WAVES
+        return color;
     }
     
-    vec3 color = ambience + (ID * surfaceColor + IS * vec3(1.0)) * light.color;
+    // ELSE: hit.isCube = true
+    // Adjust the uv so Mr. Van Damme can appear appropriately on the cube
+    uv *= 3.;
+    uv.x += .85;
+    // The y changes slightly over time to account for the cube bobbing
+    uv.y += .7 + (.1 * cos(time));
+    
+    // get the color of the surface (aka sample the texture)
+    vec3 surfaceColor = vec3(texture(video, uv));   
+    color += (ID * surfaceColor + IS * vec3(1.0)) * light.color;
     
     return color;
 }
-
-mat4 viewMatrix(vec3 eye, vec3 center, vec3 up)
-{
- 	vec3 f = normalize(center - eye);
-    vec3 s = normalize(cross(f, up));
-    vec3 u = cross(s, f);
-    return mat4(
-    	vec4(s, 0.0),
-        vec4(u, 0.0),
-        vec4(-f, 0.0),
-        vec4(0.0, 0.0, 0.0, 1.0)
-   	);
-}
-
-vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
-{
- 	vec2 xy = fragCoord - size * 0.5;
-    float z = size.y / tan(radians(fieldOfView) * 0.5);
-    return normalize(vec3(xy, -z));
-}
-
 
 //------------------------------------------------------------
 // SHADERTOY MAIN
@@ -265,7 +379,7 @@ vec3 rayDirection(float fieldOfView, vec2 size, vec2 fragCoord)
 void mainImage(out color4 fragColor, in sCoord fragCoord)
 {
     // viewing plane (viewport) inputs
-    const sBasis eyePosition = sBasis(0.0);
+    const sBasis eyePosition = vec3(10.0, 5.0, 14.0);
     const sScalar viewportHeight = 2.0, focalLength = 1.5;
     
     // viewport info
@@ -276,23 +390,25 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     
     // render
     initViewport(vp, viewportHeight, focalLength, fragCoord, iResolution.xy);
-    initRayPersp(ray, eyePosition, vp.viewportPoint.xyz);
+    initRayPersp(ray, eyePosition, vp.viewportPoint.xyz, 45.0, iResolution.xy, fragCoord);
  
+    // OLD:
     //fragColor = vec4(fbm6(ray.direction.xy * 2.));
     
-    vec2 uv = fragCoord / iResolution.xy;
-    vec3 viewDir = rayDirection(45.0, iResolution.xy, fragCoord);
-    vec3 eye = vec3(10.0, 5.0, 14.0);
+    // Create a conversion from the camera to the world
+    mat4 viewToWorld = viewMatrix(eyePosition, vec3(0.0), vec3(0.0, 1.0, 0.0));
     
-    mat4 viewToWorld = viewMatrix(eye, vec3(0.0), vec3(0.0, 1.0, 0.0));
+    // Calculate the view from the world direction (TO ROTATE THE CAMERA)
+    vec3 worldDir = (viewToWorld * vec4(ray.direction, 0.0)).xyz;
     
-    vec3 worldDir = (viewToWorld * vec4(viewDir, 0.0)).xyz;
-    
+    // Create a hit structure and then raymarch
     Hit hit;
-    shortestDistanceToSurface(eye, worldDir, MIN_DIST, MAX_DIST, hit);
+    raymarch(eyePosition, worldDir, MIN_DIST, MAX_DIST, hit, iTime, iMouse.x);
     
+    // If there is no hit
     if(hit.hDist > MAX_DIST - EPSILON)
     {
+        // Create a blend of blue for the sky.
         vec3 normDir = normalize(worldDir);
         float blendAmount = 0.5 * (normDir.y + 1.0);
      	fragColor = mix(vec4(1.0), vec4(0.2, 0.7, 1.0, 1.0), blendAmount);
@@ -300,8 +416,8 @@ void mainImage(out color4 fragColor, in sCoord fragCoord)
     }
     
     // The closest point on the surface to the eyepoint along the view ray;
-    vec3 p = eye + hit.hDist * worldDir;
-    
-    vec3 color = lighting(p, eye, uv, hit);
+    vec3 p = eyePosition + hit.hDist * worldDir;
+    // Color the scene by calling the lighting function
+    vec3 color = lighting(p, eyePosition, vp.uv, hit, iChannel1, iTime, iMouse.x);
     fragColor = vec4(color, 1.0);
 }
