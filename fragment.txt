@@ -1,5 +1,26 @@
 #version 300 es
 
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: fragment.glsl
+//	 Purpose: Either output the light if lighting is done per-vertex
+//		or calculate the light if the lighting is done per-fragment
+//
+//	Contributors:
+//		Daniel Buckstein provided a lot of the knowledge and starter framework behind this code
+//		NASA for the image of the moon (used as a texture map)
+//			Source: https://nasa3d.arc.nasa.gov/detail/as08-17-2670
+
 #define PF
 // PV - Per-vertex
 // PF - Per-fragment
@@ -11,15 +32,10 @@ precision highp float;
 layout (location = 0) out vec4 rtFragColor;
 // out vec4 rtFragColor
 
+uniform sampler2D uTextureMap;
+
 // VARYING
-// PER-VERTEX: receive final color
-// in vec4 vColor;
-
-// PER-FRAGMENT:
-in vec4 vNormal;
-//in vec2 vTexcoord;
 in vec4 vTexcoord;
-
 #ifdef PV
 in vec4 vColor;
 #endif
@@ -31,7 +47,7 @@ in vec3 vNLight[3];
 in float vLightDist[3];
 in vec4 vLightColor[3];
 in float vLightInt[3];
-in vec4 vLightCenter[3];
+in vec4 vNormal;
 #endif
 
 // attenuation: calculate attenuation for the light
@@ -45,10 +61,10 @@ float attenuation(in float lightDist, in float lightIntensity)
 }
 
 // lambertian: calculate lambertian reflectance with attenuation
-//		vec3 nNorm:			the normalized normal of the surface
-//		vec3 nLight:		the normalized vector of the light
-//		PointLight light:	the light to get the intensity from
-//		float lightDist:	the distance to the light from the surface
+//		vec3 nNorm:				the normalized normal of the surface
+//		vec3 nLight:			the normalized vector of the light
+//		float lightIntensity:	the intensity of the light
+//		float lightDist:		the distance to the light from the surface
 float lambertian(in vec3 nNorm, in vec3 nLight, in float lightIntensity, in float lightDist)
 {
 	// Calculate the diffuse coefficient
@@ -82,41 +98,44 @@ float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
 }
 
 // lighting: calculates the color after lighting the sceen
-//		vec4 posClip:		the object in clip space
-//		vec4 posSurface:	the position of the surface (view or object)
-//		PointLight light:	the light that is being calculated about
-//		mat3 normalMatrix:	matrix needed to create a normalized surface normal
+//		vec4 posClip:			the object in clip space
+//		vec4 posSurface:		the position of the surface (view or object)
+//		vec3 nNorm:				the normalalized normal of the surface
+//		vec3 nLight:			the normalized light vector
+//		float lightDist:		the distance to the light from the surface
+//		vec4 lightColor:		the color of the light
+//		float lightIntensity:	the intensity of the light
+//		sampler2D texMap:		the texture to sample from
 vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm, in vec3 nLight,
-			  in float lightDist, in vec4 lightColor, in float lightIntensity)
+			  in float lightDist, in vec4 lightColor, in float lightIntensity,
+			  in sampler2D texMap)
 {
 
 	float iD = lambertian(nNorm, nLight, 100., lightDist);
 	float iS = phong(posClip, posSurface, nLight, nNorm);
-	return (iD * vec4(1.0) + iS * vec4(1.)) * lightColor;
+	return (iD * texture(texMap, vTexcoord.xy) + iS * vec4(1.)) * lightColor;
 }
 
+// Either output the lighting
+// Or calculate the lighting
 void main()
 {
 
  	// PER-FRAGMENT inputs used to calculate final color
-  
+ 	// Do all the lighting calculations in here
   	#ifdef PF
   	vec4 N = normalize(vNormal); 
-  	vec3 distVec = vec3(vLightCenter[0] - vPosSurface);
-	float distVecSq = dot(distVec, distVec);
-	float lightDist = sqrt(distVecSq);
-	vec3 nLight = distVec / lightDist;
-  	  	
-  	rtFragColor = lighting(vPosClip, vPosSurface, vec3(N), nLight, lightDist,
-  							 vLightColor[0], vLightInt[0]);
-
-
-  	//rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), nLight, lightDist,
-  	//						 vLightColor[1], vLightInt[1]);
-  	//rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), vNLight[2], vLightDist[2],
-  	//						 vLightColor[2], vLightInt[2]);
+    
+  	rtFragColor = lighting(vPosClip, vPosSurface, vec3(N), vNLight[0], vLightDist[0],
+  							 vLightColor[0], vLightInt[0], uTextureMap);
+  	rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), vNLight[1], vLightDist[1],
+  							 vLightColor[1], vLightInt[1], uTextureMap);
+  	rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), vNLight[2], vLightDist[2],
+  							 vLightColor[2], vLightInt[2], uTextureMap);  
   	#endif
   	
+  	// PER-VERTEX
+  	// Just output the color received from the vertex shader
   	#ifdef PV
   	rtFragColor = vColor;  
   	#endif

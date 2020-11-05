@@ -1,9 +1,30 @@
 #version 300 es
 
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: vertex.glsl
+//	 Purpose: Sets up lighting for various lights
+//		Also passes variables to the fragment shader if needed
+//
+//	Contributors:
+//		Daniel Buckstein provided a lot of the knowledge and starter framework behind this code
+//		NASA for the image of the moon (used as a texture map)
+//			Source: https://nasa3d.arc.nasa.gov/detail/as08-17-2670
+
 #define PF
 // PV - Per-vertex
 // PF - Per-fragment
-#define VS
+#define OS
 // VS - view-space
 // OS - object-space
 
@@ -19,6 +40,9 @@ uniform mat4 uModelMat;
 uniform mat4 uViewMat;
 uniform mat4 uProjMat;
 uniform mat4 uViewProjMat;
+
+// TEXTURE UNIFORM
+uniform sampler2D uTextureMap;
 
 // VARYINGS
 
@@ -40,7 +64,6 @@ out vec3 vNLight[3];
 out float vLightDist[3];
 out vec4 vLightColor[3];
 out float vLightInt[3];
-out vec4 vLightCenter[3];
 #endif
 
 // Structure for containing a pointlight
@@ -138,12 +161,12 @@ float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
 //		vec4 posSurface:	the position of the surface (view or object)
 //		PointLight light:	the light that is being calculated about
 vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm,
-			 in PointLight light, in LightingInfo li)
+			 in PointLight light, in LightingInfo li, in sampler2D texMap)
 {
 	
 	float iD = lambertian(nNorm, li.nLight, light, li.lightDist);
 	float iS = phong(posClip, posSurface, li.nLight, nNorm);
-	return (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
+	return (iD * texture(texMap, aTexcoord.xy) + iS * vec4(1.)) * light.color;
 }
 
 void main()
@@ -152,12 +175,12 @@ void main()
 	mat4 modelViewMat = uViewMat * uModelMat;	
 	vec4 posCamera = modelViewMat * aPosition;	
 	vec4 posSurface;
-	
 	vec4 posClip = uProjMat * posCamera;
 	gl_Position = posClip;
 	
 	// NORMAL PIPELINE
 	mat3 normalMatrix = transpose(inverse(mat3(modelViewMat)));
+	vNormal = vec4(normalMatrix * aNormal, 0.0);
 	
 	// TEXCOORD PIPELINE
 	mat4 atlasMat = mat4(0.5, 0.0, 0.0, 0.0,
@@ -202,42 +225,41 @@ void main()
 	initLightingInfo(posClip, posSurface, lights[1], info[1]);
 	initLightingInfo(posClip, posSurface, lights[2], info[2]);
 	
-	vNormal = vec4(normalMatrix * aNormal, 0.0);
-	
 	#ifdef PV // PER-VERTEX
 	// Go through all the lights and color the sphere
 	for(int i = 2; i >= 0; --i)
 	{
-		vColor += lighting(posClip, posSurface, vec3(vNormal), lights[i], info[i]);
+		vColor += lighting(posClip, posSurface, vec3(vNormal), lights[i], info[i], uTextureMap);
 	}
 	#endif
 
 	#ifdef PF // PER-FRAGMENT
-	// Send the appropriate data over to 
+	// Send the appropriate data over to the fragment shader
 	
+	// The two frames of reference
 	vPosClip = posClip;
 	vPosSurface = posSurface;
 	
+	// Information about the lights
+	// normalized light vector
 	vNLight[0] = info[0].nLight;
 	vNLight[1] = info[1].nLight;
 	vNLight[2] = info[2].nLight;
 	
+	// light distance
 	vLightDist[0] = info[0].lightDist;
 	vLightDist[1] = info[1].lightDist;
 	vLightDist[2] = info[2].lightDist;
 	
+	// light color
 	vLightColor[0] = lights[0].color;
 	vLightColor[1] = lights[1].color;
 	vLightColor[2] = lights[2].color;
 	
+	// light intensity
 	vLightInt[0] = lights[0].intensity;
 	vLightInt[1] = lights[1].intensity;
 	vLightInt[2] = lights[2].intensity;
-	
-	vLightCenter[0] - lights[0].center;
-	vLightCenter[1] - lights[1].center;
-	vLightCenter[2] - lights[2].center;
+
 	#endif
-	
-	//vTexcoord = aTexcoord;
 }
