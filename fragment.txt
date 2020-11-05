@@ -1,5 +1,9 @@
 #version 300 es
 
+#define PF
+// PV - Per-vertex
+// PF - Per-fragment
+
 #ifdef GL_ES
 precision highp float;
 #endif // GL_ES
@@ -11,23 +15,109 @@ layout (location = 0) out vec4 rtFragColor;
 // PER-VERTEX: receive final color
 // in vec4 vColor;
 
- // PER-FRAGMENT:
- in vec4 vNormal;
- //in vec2 vTexcoord;
- in vec4 vTexcoord;
- 
- in vec4 vColor;
- 
- void main()
- {
- 	// rtFragColor = vec4(0.0, 1.0, 1.0, 1.0);
- 	
- 	// PER-VERTEX input is final color
- 	// rtFragColor = vColor;
- 	
+// PER-FRAGMENT:
+in vec4 vNormal;
+//in vec2 vTexcoord;
+in vec4 vTexcoord;
+
+#ifdef PV
+in vec4 vColor;
+#endif
+
+#ifdef PF
+in vec4 vPosClip;
+in vec4 vPosSurface;
+in vec3 vNLight[3];
+in float vLightDist[3];
+in vec4 vLightColor[3];
+in float vLightInt[3];
+in vec4 vLightCenter[3];
+#endif
+
+// attenuation: calculate attenuation for the light
+//		float lightDist:		the distance to the light from the surface
+//		float lightIntensity:	the intensity of the light
+float attenuation(in float lightDist, in float lightIntensity)
+{
+	// Calulate the distance / intensity for faster calculations
+	float distIntensity = lightDist / lightIntensity; 
+	return 1. /(1. + distIntensity + (distIntensity * distIntensity) );
+}
+
+// lambertian: calculate lambertian reflectance with attenuation
+//		vec3 nNorm:			the normalized normal of the surface
+//		vec3 nLight:		the normalized vector of the light
+//		PointLight light:	the light to get the intensity from
+//		float lightDist:	the distance to the light from the surface
+float lambertian(in vec3 nNorm, in vec3 nLight, in float lightIntensity, in float lightDist)
+{
+	// Calculate the diffuse coefficient
+	float kD = max(0., dot(nNorm, nLight));
+	// Calculate the attenuation
+	float atten = attenuation(lightDist, lightIntensity);
+	// return the diffuse intensity (diffuse coefficient * attenuation)
+	return kD * atten;
+}
+
+// phong: calculate phong reflectance
+//		vec4 posClip:		the object in clip space (used for the viewer vector)
+//		vec4 posSurface:	the position of the surface (view or object)
+//		vec3 nLight:		the normalized vector of the light
+//		vec3 nNorm:			the normalized normal of the surface
+float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
+{
+	// Get the normal view vector by subtracting the posSurface from the posClip
+	vec3 nViewVec = normalize(vec3(posClip - posSurface));
+	// Calculate the reflected light vector by taking the inverse of the light (pointing towards sphere))
+	vec3 nRefLightVec = reflect(-nLight, nNorm);
+	// Specular coefficient
+	float kS = max(0., dot(nRefLightVec, nViewVec));
+	// Get the specular intensity by squaring the specular coefficient a lot
+	float iS = kS * kS;
+	iS *= iS;
+	iS *= iS; 
+	iS *= iS;
+	iS *= iS;  
+	return iS;
+}
+
+// lighting: calculates the color after lighting the sceen
+//		vec4 posClip:		the object in clip space
+//		vec4 posSurface:	the position of the surface (view or object)
+//		PointLight light:	the light that is being calculated about
+//		mat3 normalMatrix:	matrix needed to create a normalized surface normal
+vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm, in vec3 nLight,
+			  in float lightDist, in vec4 lightColor, in float lightIntensity)
+{
+
+	float iD = lambertian(nNorm, nLight, 100., lightDist);
+	float iS = phong(posClip, posSurface, nLight, nNorm);
+	return (iD * vec4(1.0) + iS * vec4(1.)) * lightColor;
+}
+
+void main()
+{
+
  	// PER-FRAGMENT inputs used to calculate final color
- 	vec4 N = normalize(vNormal);
- 	rtFragColor = vec4(N.xyz * 0.5 + 0.5, 1.0);
   
-  	rtFragColor = vColor;
- } 
+  	#ifdef PF
+  	vec4 N = normalize(vNormal); 
+  	vec3 distVec = vec3(vLightCenter[0] - vPosSurface);
+	float distVecSq = dot(distVec, distVec);
+	float lightDist = sqrt(distVecSq);
+	vec3 nLight = distVec / lightDist;
+  	  	
+  	rtFragColor = lighting(vPosClip, vPosSurface, vec3(N), nLight, lightDist,
+  							 vLightColor[0], vLightInt[0]);
+
+
+  	//rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), nLight, lightDist,
+  	//						 vLightColor[1], vLightInt[1]);
+  	//rtFragColor +=  lighting(vPosClip, vPosSurface, vec3(N), vNLight[2], vLightDist[2],
+  	//						 vLightColor[2], vLightInt[2]);
+  	#endif
+  	
+  	#ifdef PV
+  	rtFragColor = vColor;  
+  	#endif
+} 

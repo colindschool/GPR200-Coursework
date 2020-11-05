@@ -1,9 +1,9 @@
 #version 300 es
 
-#define PV
+#define PF
 // PV - Per-vertex
 // PF - Per-fragment
-#define OS
+#define VS
 // VS - view-space
 // OS - object-space
 
@@ -12,7 +12,6 @@ layout (location = 0) in vec4 aPosition;
 layout (location = 1) in vec3 aNormal;
 
 // TEXTURE SPACE
-//layout (location = 2) in vec2 aTexcoord; // A point in space (not object space)
 layout (location = 2) in vec4 aTexcoord;
 
 // TRANSFORM UNIFORMS
@@ -21,20 +20,28 @@ uniform mat4 uViewMat;
 uniform mat4 uProjMat;
 uniform mat4 uViewProjMat;
 
-// VARYING
-// PER-VERTEX: final color
-//out vec4 vColor;
+// VARYINGS
 
 // PER-FRAGMENT: individual components
 out vec4 vNormal;
 // out vec2 vTexcoord
 out vec4 vTexcoord;
 
+// PER-VERTEX VARYINGS
+#ifdef PV
 out vec4 vColor;
+#endif
 
-out float id;
-out float is;
-out vec4 lightcolor;
+// PER-FRAGMENT VARYINGS
+#ifdef PF
+out vec4 vPosClip;
+out vec4 vPosSurface;
+out vec3 vNLight[3];
+out float vLightDist[3];
+out vec4 vLightColor[3];
+out float vLightInt[3];
+out vec4 vLightCenter[3];
+#endif
 
 // Structure for containing a pointlight
 struct PointLight
@@ -54,6 +61,28 @@ void initLight(in vec4 center, in vec4 color, in float intensity,
 	light.center = center;
 	light.color = color;
 	light.intensity = intensity;
+}
+
+// Structure for containing lighting info. Calculated prior to the vertex / fragment split
+//		vec3 distVec:		the distance vector between the light and the surface
+//		float distVecSq:	the distance squared between the light and the surface
+//		float lightDist:	the distance float between the light and the surface
+//		vec3 nLight:		the normalized light vector
+//		vec3 nNorm:			the normalized surface normal
+struct LightingInfo
+{
+	vec3 distVec;
+	float distVecSq;
+	float lightDist;
+	vec3 nLight;
+};
+
+void initLightingInfo(in vec4 posClip, in vec4 posSurface, in PointLight light, out LightingInfo li)
+{
+	li.distVec = vec3(light.center - posSurface);
+	li.distVecSq = dot(li.distVec, li.distVec);
+	li.lightDist = sqrt(li.distVecSq);
+	li.nLight = li.distVec / li.lightDist;
 }
 
 // attenuation: calculate attenuation for the light
@@ -86,10 +115,10 @@ float lambertian(in vec3 nNorm, in vec3 nLight, in PointLight light, in float li
 //		vec4 posSurface:	the position of the surface (view or object)
 //		vec3 nLight:		the normalized vector of the light
 //		vec3 nNorm:			the normalized normal of the surface
-float phong(in vec4 posClip, in vec4 posCamera, in vec3 nLight, in vec3 nNorm)
+float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
 {
 	// Get the normal view vector by subtracting the posSurface from the posClip
-	vec3 nViewVec = normalize(vec3(posClip - posCamera));
+	vec3 nViewVec = normalize(vec3(posClip - posSurface));
 	// Calculate the reflected light vector by taking the inverse of the light (pointing towards sphere))
 	vec3 nRefLightVec = reflect(-nLight, nNorm);
 	// Specular coefficient
@@ -108,29 +137,26 @@ float phong(in vec4 posClip, in vec4 posCamera, in vec3 nLight, in vec3 nNorm)
 //		vec4 posClip:		the object in clip space
 //		vec4 posSurface:	the position of the surface (view or object)
 //		PointLight light:	the light that is being calculated about
-//		mat3 normalMatrix:	matrix needed to create a normalized surface normal
-vec4 lighting(in vec4 posClip, in vec4 posCamera, in PointLight light, in mat3 normalMatrix)
+vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm,
+			 in PointLight light, in LightingInfo li)
 {
-	vec3 distVec = vec3(light.center - posCamera);
-	float distVecSq = dot(distVec, distVec);
-	float lightDist = sqrt(distVecSq);
-	vec3 nLight = distVec / lightDist;
-	vec3 nNorm = normalize(normalMatrix * aNormal);
 	
-	float iD = lambertian(nNorm, nLight, light, lightDist);
-	float iS = phong(posClip, posCamera, nLight, nNorm);
+	float iD = lambertian(nNorm, li.nLight, light, li.lightDist);
+	float iS = phong(posClip, posSurface, li.nLight, nNorm);
 	return (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
 }
 
 void main()
 {
-	mat4 modelViewMat = uViewMat * uModelMat;
-	//vec4 pos_camera = modelViewMat * aPosition;
-
+	// PERSPECTIVE PIPELINE
+	mat4 modelViewMat = uViewMat * uModelMat;	
+	vec4 posCamera = modelViewMat * aPosition;	
+	vec4 posSurface;
+	
+	vec4 posClip = uProjMat * posCamera;
+	gl_Position = posClip;
 	
 	// NORMAL PIPELINE
-	// mat4 normalMatrix = inverse(transpose(modelViewMat))
-	// vec4 norm_camera = normalMatrix * vec4(aNormal, 0.0);
 	mat3 normalMatrix = transpose(inverse(mat3(modelViewMat)));
 	
 	// TEXCOORD PIPELINE
@@ -141,12 +167,7 @@ void main()
 	vec4 uv_atlas = atlasMat * aTexcoord;
 	vTexcoord = aTexcoord;
 	
-	vec4 posCamera = modelViewMat * aPosition;	
-	vec4 posSurface;
-	
-	vec4 posClip = uProjMat * posCamera;
-	gl_Position = posClip;
-	
+	// LIGHTING PIPELINE
 	// The matrix modifier for the lights will depend
 	// on whether it is in view-space or object space
 	//
@@ -172,20 +193,51 @@ void main()
 	initLight(vec4(-8.0, 1.0, -5.0, 1.0), vec4(1.0), 100., lights[1]);
 	lights[1].center = lMatModifier * lights[1].center;
 
-	initLight(vec4(1.0, -80.0, 3.0, 1.0), vec4(1.0), 100., lights[2]);
+	initLight(vec4(-3.0, -20.0, 8.0, 1.0), vec4(1.0), 100., lights[2]);
 	lights[2].center = lMatModifier * lights[2].center;
+	
+	// LIGHTING INFO SETUP
+	LightingInfo info[3];
+	initLightingInfo(posClip, posSurface, lights[0], info[0]);
+	initLightingInfo(posClip, posSurface, lights[1], info[1]);
+	initLightingInfo(posClip, posSurface, lights[2], info[2]);
+	
+	vNormal = vec4(normalMatrix * aNormal, 0.0);
 	
 	#ifdef PV // PER-VERTEX
 	// Go through all the lights and color the sphere
 	for(int i = 2; i >= 0; --i)
 	{
-		vColor += lighting(posClip, posSurface, lights[i], normalMatrix);
+		vColor += lighting(posClip, posSurface, vec3(vNormal), lights[i], info[i]);
 	}
 	#endif
 
+	#ifdef PF // PER-FRAGMENT
+	// Send the appropriate data over to 
+	
+	vPosClip = posClip;
+	vPosSurface = posSurface;
+	
+	vNLight[0] = info[0].nLight;
+	vNLight[1] = info[1].nLight;
+	vNLight[2] = info[2].nLight;
+	
+	vLightDist[0] = info[0].lightDist;
+	vLightDist[1] = info[1].lightDist;
+	vLightDist[2] = info[2].lightDist;
+	
+	vLightColor[0] = lights[0].color;
+	vLightColor[1] = lights[1].color;
+	vLightColor[2] = lights[2].color;
+	
+	vLightInt[0] = lights[0].intensity;
+	vLightInt[1] = lights[1].intensity;
+	vLightInt[2] = lights[2].intensity;
+	
+	vLightCenter[0] - lights[0].center;
+	vLightCenter[1] - lights[1].center;
+	vLightCenter[2] - lights[2].center;
+	#endif
 	
 	//vTexcoord = aTexcoord;
-	
-	// Unwrap the geometry
-	//gl_Position = uProjMat * modelViewMat * aTexcoord;
 }
