@@ -4,8 +4,13 @@
 // e.g. uv: texture coordinate
 // e.g. normal
 
+// OBJECT SPACE
 layout (location = 0) in vec4 aPosition;
 layout (location = 1) in vec3 aNormal;
+
+// TEXTURE SPACE
+//layout (location = 2) in vec2 aTexcoord; // A point in space (not object space)
+layout (location = 2) in vec4 aTexcoord;
 
 // TRANSFORM UNIFORMS
 uniform mat4 uModelMat;
@@ -18,39 +23,99 @@ uniform mat4 uViewProjMat;
 //out vec4 vColor;
 
 // PER-FRAGMENT: individual components
-out vec3 vNormal;
+out vec4 vNormal;
+// out vec2 vTexcoord
+out vec4 vTexcoord;
+
+out vec4 vColor;
+
+struct PointLight
+{
+	vec4 center; 		// Location of the light source
+	vec4 color;			// Color of the light
+	float intensity;		// Intensity of the light
+};
 
 void main()
 {
-	// REQUIRED: SET THIS VALUE
-	// problem: gl_Position is in "clip space"
-	// problem: aPosition is in "object space"
-	// gl_Position = aPosition;
-	
 	// position in world space (wrong)
 	vec4 pos_world = uModelMat * aPosition;
 	// gl_Position = pos_world;
 	
 	// position in camera space (still wrong)
-	vec4 pos_camera = uViewMat * pos_world;
+	//vec4 pos_camera = uViewMat * pos_world;
 	// vec4 pos_camera = uViewMat * uModelMat * aPosition;
 	// gl_Position = pos_camera;
 	
 	// position in clip space (correct)
-	vec4 pos_clip = uProjMat * pos_camera;
+	//vec4 pos_clip = uProjMat * pos_camera;
 	// vec4 pos_clip = uViewProjMat * pos_world;
 	// vec4 pos_clip = uProjMat * uViewMat * uModelMat * aPosition;
-	gl_Position = pos_clip;
-	// OPTIONAL: write varyings
-	// vColor = vec4(1.0, 0.5, 0.0, 1.0);
-	// vColor = aPosition;
-	// vColor = pos_camera;
+	//gl_Position = pos_clip;
+	
+	mat4 modelViewMat = uViewMat * uModelMat;
+	//vec4 pos_camera = modelViewMat * aPosition;
+
+	
+	// NORMAL PIPELINE
+	// mat4 normalMatrix = inverse(transpose(modelViewMat))
+	// vec4 norm_camera = normalMatrix * vec4(aNormal, 0.0);
+	mat3 normalMatrix = transpose(inverse(mat3(modelViewMat)));
+	vec3 norm_camera = normalMatrix * aNormal;
+	
+	// TEXCOORD PIPELINE
+	mat4 atlasMat = mat4(0.5, 0.0, 0.0, 0.0,
+						 0.0, 0.5, 0.0, 0.0,
+						 0.0, 0.0, 1.0, 0.0,
+						 0.25, 0.25, 0.0, 1.0);
+	vec4 uv_atlas = atlasMat * aTexcoord;
+	vTexcoord = aTexcoord;
+	
+	
+	// LIGHT SETUP
+	PointLight light;
+	light.center = vec4(1.0, 5.0, -4.0, 1.0);
+	light.intensity = 120.;
+	light.color = vec4(1.0);
+	
+	// PER-VERTEX, VIEW-SPACE
+	//
+	light.center = uViewMat * light.center;
+	vec4 posCamera = modelViewMat * aPosition;	
+	vec4 posClip = uProjMat * posCamera;
+	gl_Position = posClip;
+	
+	
+	vec3 distVec = vec3(light.center - posCamera);
+	float distVecSq = dot(distVec, distVec);
+	float lightDist = sqrt(distVecSq);
+	vec3 nLight = distVec / lightDist;
+
+	vec3 nNorm = normalize(normalMatrix * aNormal);
+	
+	float kD = max(0., dot(nNorm, nLight));
+	float distIntensity = lightDist / light.intensity;
+	float attenuation = 1. /(1. + distIntensity + (distIntensity * distIntensity) );
+	float iD = kD  * attenuation;
+	
+	vec3 nViewVec = normalize(vec3(posClip - posCamera));
+	vec3 nRefLightVec = reflect(-nLight, nNorm);
+	float kS = max(0., dot(nRefLightVec, nViewVec));
+	float iS = pow(kS, 64.);
+	
+	vColor = (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
+	
+	
+	// PER-VERTEX, OBJECT-SPACE
 	
 	// DEBUGGING:
 	// output normal as color
 	// PER-VERTEX output
 	//vColor = vec4(aNormal * 0.5 + 0.5, 1.0);
 	
-	vNormal = aNormal;
-
+	vNormal = vec4(norm_camera, 0.0);
+	//vTexcoord = aTexcoord;
+	
+	// Unwrap the geometry
+	//gl_Position = uProjMat * modelViewMat * aTexcoord;
 }
