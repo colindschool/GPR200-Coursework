@@ -80,6 +80,7 @@ void main()
 	
 	// PER-VERTEX, VIEW-SPACE
 	//
+	
 	light.center = uViewMat * light.center;
 	vec4 posCamera = modelViewMat * aPosition;	
 	vec4 posClip = uProjMat * posCamera;
@@ -105,8 +106,33 @@ void main()
 	
 	vColor = (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
 	
-	
+	/*
 	// PER-VERTEX, OBJECT-SPACE
+	light.center = uModelMat * light.center;
+	vec4 posCamera = modelViewMat * aPosition;	
+	vec4 posClip = uProjMat * posCamera;
+	gl_Position = posClip;
+	
+	
+	vec3 distVec = vec3(light.center - posCamera);
+	float distVecSq = dot(distVec, distVec);
+	float lightDist = sqrt(distVecSq);
+	vec3 nLight = distVec / lightDist;
+
+	vec3 nNorm = normalize(normalMatrix * aNormal);
+	
+	float kD = max(0., dot(nNorm, nLight));
+	float distIntensity = lightDist / light.intensity;
+	float attenuation = 1. /(1. + distIntensity + (distIntensity * distIntensity) );
+	float iD = kD  * attenuation;
+	
+	vec3 nViewVec = normalize(vec3(posClip - posCamera));
+	vec3 nRefLightVec = reflect(-nLight, nNorm);
+	float kS = max(0., dot(nRefLightVec, nViewVec));
+	float iS = pow(kS, 64.);
+	
+	vColor = (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
+	*/
 	
 	// DEBUGGING:
 	// output normal as color
