@@ -1,8 +1,11 @@
 #version 300 es
-// MAIN DUTY: READ ATTRIBUTES
-// e.g. 3D position in space
-// e.g. uv: texture coordinate
-// e.g. normal
+
+#define PV
+// PV - Per-vertex
+// PF - Per-fragment
+#define OS
+// VS - view-space
+// OS - object-space
 
 // OBJECT SPACE
 layout (location = 0) in vec4 aPosition;
@@ -29,6 +32,11 @@ out vec4 vTexcoord;
 
 out vec4 vColor;
 
+out float id;
+out float is;
+out vec4 lightcolor;
+
+// Structure for containing a pointlight
 struct PointLight
 {
 	vec4 center; 		// Location of the light source
@@ -36,23 +44,86 @@ struct PointLight
 	float intensity;		// Intensity of the light
 };
 
+// initLight: Initializes a pointlight 
+//		vec4 center: 		the position of the light in world space
+//		vec4 color: 		the color of the light
+//		float intensity:	the intensity of the light
+void initLight(in vec4 center, in vec4 color, in float intensity, 
+				out PointLight light)
+{
+	light.center = center;
+	light.color = color;
+	light.intensity = intensity;
+}
+
+// attenuation: calculate attenuation for the light
+//		float lightDist:		the distance to the light from the surface
+//		float lightIntensity:	the intensity of the light
+float attenuation(in float lightDist, in float lightIntensity)
+{
+	// Calulate the distance / intensity for faster calculations
+	float distIntensity = lightDist / lightIntensity; 
+	return 1. /(1. + distIntensity + (distIntensity * distIntensity) );
+}
+
+// lambertian: calculate lambertian reflectance with attenuation
+//		vec3 nNorm:			the normalized normal of the surface
+//		vec3 nLight:		the normalized vector of the light
+//		PointLight light:	the light to get the intensity from
+//		float lightDist:	the distance to the light from the surface
+float lambertian(in vec3 nNorm, in vec3 nLight, in PointLight light, in float lightDist)
+{
+	// Calculate the diffuse coefficient
+	float kD = max(0., dot(nNorm, nLight));
+	// Calculate the attenuation
+	float atten = attenuation(lightDist, light.intensity);
+	// return the diffuse intensity (diffuse coefficient * attenuation)
+	return kD * atten;
+}
+
+// phong: calculate phong reflectance
+//		vec4 posClip:		the object in clip space (used for the viewer vector)
+//		vec4 posSurface:	the position of the surface (view or object)
+//		vec3 nLight:		the normalized vector of the light
+//		vec3 nNorm:			the normalized normal of the surface
+float phong(in vec4 posClip, in vec4 posCamera, in vec3 nLight, in vec3 nNorm)
+{
+	// Get the normal view vector by subtracting the posSurface from the posClip
+	vec3 nViewVec = normalize(vec3(posClip - posCamera));
+	// Calculate the reflected light vector by taking the inverse of the light (pointing towards sphere))
+	vec3 nRefLightVec = reflect(-nLight, nNorm);
+	// Specular coefficient
+	float kS = max(0., dot(nRefLightVec, nViewVec));
+	// Get the specular intensity by squaring the specular coefficient a lot
+	float iS = kS * kS;
+	iS *= iS;
+	iS *= iS; 
+	iS *= iS;  
+	iS *= iS;
+	iS *= iS;
+	return iS;
+}
+
+// lighting: calculates the color after lighting the sceen
+//		vec4 posClip:		the object in clip space
+//		vec4 posSurface:	the position of the surface (view or object)
+//		PointLight light:	the light that is being calculated about
+//		mat3 normalMatrix:	matrix needed to create a normalized surface normal
+vec4 lighting(in vec4 posClip, in vec4 posCamera, in PointLight light, in mat3 normalMatrix)
+{
+	vec3 distVec = vec3(light.center - posCamera);
+	float distVecSq = dot(distVec, distVec);
+	float lightDist = sqrt(distVecSq);
+	vec3 nLight = distVec / lightDist;
+	vec3 nNorm = normalize(normalMatrix * aNormal);
+	
+	float iD = lambertian(nNorm, nLight, light, lightDist);
+	float iS = phong(posClip, posCamera, nLight, nNorm);
+	return (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
+}
+
 void main()
 {
-	// position in world space (wrong)
-	vec4 pos_world = uModelMat * aPosition;
-	// gl_Position = pos_world;
-	
-	// position in camera space (still wrong)
-	//vec4 pos_camera = uViewMat * pos_world;
-	// vec4 pos_camera = uViewMat * uModelMat * aPosition;
-	// gl_Position = pos_camera;
-	
-	// position in clip space (correct)
-	//vec4 pos_clip = uProjMat * pos_camera;
-	// vec4 pos_clip = uViewProjMat * pos_world;
-	// vec4 pos_clip = uProjMat * uViewMat * uModelMat * aPosition;
-	//gl_Position = pos_clip;
-	
 	mat4 modelViewMat = uViewMat * uModelMat;
 	//vec4 pos_camera = modelViewMat * aPosition;
 
@@ -61,7 +132,6 @@ void main()
 	// mat4 normalMatrix = inverse(transpose(modelViewMat))
 	// vec4 norm_camera = normalMatrix * vec4(aNormal, 0.0);
 	mat3 normalMatrix = transpose(inverse(mat3(modelViewMat)));
-	vec3 norm_camera = normalMatrix * aNormal;
 	
 	// TEXCOORD PIPELINE
 	mat4 atlasMat = mat4(0.5, 0.0, 0.0, 0.0,
@@ -71,75 +141,49 @@ void main()
 	vec4 uv_atlas = atlasMat * aTexcoord;
 	vTexcoord = aTexcoord;
 	
+	vec4 posCamera = modelViewMat * aPosition;	
+	vec4 posSurface;
+	
+	vec4 posClip = uProjMat * posCamera;
+	gl_Position = posClip;
+	
+	// The matrix modifier for the lights will depend
+	// on whether it is in view-space or object space
+	//
+	// All the lights centers' will be adjusted by the lMatModifier
+	mat4 lMatModifier;
+	
+	#ifdef VS // View space
+	lMatModifier = uViewMat;
+	posSurface = posCamera;
+	#endif
+	
+	#ifdef OS // Object space
+	lMatModifier = inverse(uModelMat);
+	posSurface = aPosition;
+	#endif
+	
 	
 	// LIGHT SETUP
-	PointLight light;
-	light.center = vec4(1.0, 5.0, -4.0, 1.0);
-	light.intensity = 120.;
-	light.color = vec4(1.0);
+	PointLight lights[3];
+	initLight(vec4(1.0, 5.0, 3.0, 1.0), vec4(1.0), 100., lights[0]);
+	lights[0].center = lMatModifier * lights[0].center;
 	
-	// PER-VERTEX, VIEW-SPACE
-	//
-	
-	light.center = uViewMat * light.center;
-	vec4 posCamera = modelViewMat * aPosition;	
-	vec4 posClip = uProjMat * posCamera;
-	gl_Position = posClip;
-	
-	
-	vec3 distVec = vec3(light.center - posCamera);
-	float distVecSq = dot(distVec, distVec);
-	float lightDist = sqrt(distVecSq);
-	vec3 nLight = distVec / lightDist;
+	initLight(vec4(-8.0, 1.0, -5.0, 1.0), vec4(1.0), 100., lights[1]);
+	lights[1].center = lMatModifier * lights[1].center;
 
-	vec3 nNorm = normalize(normalMatrix * aNormal);
+	initLight(vec4(1.0, -80.0, 3.0, 1.0), vec4(1.0), 100., lights[2]);
+	lights[2].center = lMatModifier * lights[2].center;
 	
-	float kD = max(0., dot(nNorm, nLight));
-	float distIntensity = lightDist / light.intensity;
-	float attenuation = 1. /(1. + distIntensity + (distIntensity * distIntensity) );
-	float iD = kD  * attenuation;
-	
-	vec3 nViewVec = normalize(vec3(posClip - posCamera));
-	vec3 nRefLightVec = reflect(-nLight, nNorm);
-	float kS = max(0., dot(nRefLightVec, nViewVec));
-	float iS = pow(kS, 64.);
-	
-	vColor = (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
-	
-	/*
-	// PER-VERTEX, OBJECT-SPACE
-	light.center = uModelMat * light.center;
-	vec4 posCamera = modelViewMat * aPosition;	
-	vec4 posClip = uProjMat * posCamera;
-	gl_Position = posClip;
-	
-	
-	vec3 distVec = vec3(light.center - posCamera);
-	float distVecSq = dot(distVec, distVec);
-	float lightDist = sqrt(distVecSq);
-	vec3 nLight = distVec / lightDist;
+	#ifdef PV // PER-VERTEX
+	// Go through all the lights and color the sphere
+	for(int i = 2; i >= 0; --i)
+	{
+		vColor += lighting(posClip, posSurface, lights[i], normalMatrix);
+	}
+	#endif
 
-	vec3 nNorm = normalize(normalMatrix * aNormal);
 	
-	float kD = max(0., dot(nNorm, nLight));
-	float distIntensity = lightDist / light.intensity;
-	float attenuation = 1. /(1. + distIntensity + (distIntensity * distIntensity) );
-	float iD = kD  * attenuation;
-	
-	vec3 nViewVec = normalize(vec3(posClip - posCamera));
-	vec3 nRefLightVec = reflect(-nLight, nNorm);
-	float kS = max(0., dot(nRefLightVec, nViewVec));
-	float iS = pow(kS, 64.);
-	
-	vColor = (iD * vec4(1.0) + iS * vec4(1.)) * light.color;
-	*/
-	
-	// DEBUGGING:
-	// output normal as color
-	// PER-VERTEX output
-	//vColor = vec4(aNormal * 0.5 + 0.5, 1.0);
-	
-	vNormal = vec4(norm_camera, 0.0);
 	//vTexcoord = aTexcoord;
 	
 	// Unwrap the geometry
