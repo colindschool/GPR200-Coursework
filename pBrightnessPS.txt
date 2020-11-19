@@ -1,0 +1,32 @@
+#version 300 es
+
+#ifdef GL_ES
+precision highp float;
+#endif // GL_ES
+
+layout (location = 0) out vec4 rtFragColor;
+
+uniform sampler2D uTex;
+uniform vec2 uResolution;
+
+in vec2 vTexcoord;
+in vec4 vClipspace;
+
+float calcLuma(vec4 color)
+{
+	return 0.21 * color.r + 0.72 * color.g + 0.07 * color.b;
+}
+
+void main()
+{
+	vec4 ndc = vClipspace / vClipspace.w;
+	//vec2 uv = ndc.xy * 0.5 + 0.5;
+	vec2 uv = vTexcoord.xy;
+	vec4 col = texture(uTex, uv);
+	float luma = calcLuma(col);
+	//col = col * (luma * luma * (3. - 2. * luma));
+	//col = vec4(luma * luma * (3. - 2. * luma));
+	
+	col *= luma * luma * luma;
+	rtFragColor = col;
+}
