@@ -1,0 +1,17 @@
+#version 300 es
+
+layout (location = 0) in vec4 aPosition;
+
+uniform mat4 uModelMat, uViewMat, uProjMat;
+uniform vec2 uResolution;
+
+out vec2 vTexcoord;
+out vec2 vInvResolution;
+
+void main()
+{
+	gl_Position = aPosition;
+	vTexcoord = aPosition.xy;
+	vInvResolution = 1.0 / uResolution;
+	
+}
