@@ -8,16 +8,18 @@ precision highp float;
 #endif // GL_ES
 
 in vec4 vNormal;
-in vec2 vTexcoord;
 in vec4 vPosClip;
 in vec4 vPosSurface;
-in vec4 vLightPos[2];
+in vec3 vLightPos[2];
 in vec4 vLightColor[2];
 in float vLightIntensity[2];
+
+in vec3 vLightDir[2];
 
 layout (location = 0) out vec4 rtFragColor;
 
 uniform sampler2D uTex;
+uniform sampler2D uTexNormalMap;
 
 // Structure for containing lighting info.
 //		vec3 distVec:		the distance vector between the light and the surface
@@ -29,15 +31,13 @@ struct LightingInfo
 	vec3 distVec;
 	float distVecSq;
 	float lightDist;
-	vec3 nLight;
 };
 
-void initLightingInfo(in vec4 posSurface, in vec4 lightCenter, out LightingInfo li)
+void initLightingInfo(in vec4 posSurface, in vec3 lightCenter, out LightingInfo li)
 {
-	li.distVec = vec3(lightCenter - posSurface);
+	li.distVec = lightCenter - vec3(posSurface);
 	li.distVecSq = dot(li.distVec, li.distVec);
 	li.lightDist = sqrt(li.distVecSq);
-	li.nLight = li.distVec / li.lightDist;
 }
 
 // attenuation: calculate attenuation for the light
@@ -96,25 +96,28 @@ float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
 //		float lightIntensity:	the intensity of the light
 //		vec4 surfColor:			the color of the surface
 vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm, in LightingInfo li, in vec4 lightColor, in float lightIntensity,
-			  in vec4 surfColor)
+			  in vec4 surfColor, in vec3 lightDir)
 {
 
-	float iD = lambertian(nNorm, li.nLight, 100., li.lightDist);
-	float iS = phong(posClip, posSurface, li.nLight, nNorm);
+	float iD = lambertian(nNorm, lightDir, 100., li.lightDist);
+	float iS = phong(posClip, posSurface, lightDir, nNorm);
 	return (iD * surfColor + iS * vec4(1.)) * lightColor;
 }
 
 void main()
 {
-	vec4 N = normalize(vNormal);
 	vec4 color;
+
+	vec4 ndc = vPosClip / vPosClip.w;
 	
+	vec4 normal = texture(uTexNormalMap, ndc.xy);
 	LightingInfo lightingInfo[2];
 	
 	#ifdef TEXTURE
-	vec4 surfColor = texture(uTex, vTexcoord);
+	vec4 surfColor = texture(uTex, ndc.xy);
 	color = surfColor;
 	#endif
+	
 	#ifdef SOLIDCOLOR
 	vec4 surfColor = vec4(1.0, 0.5, 0.5, 1.0);
 	color = surfColor;
@@ -125,8 +128,8 @@ void main()
 	for(int i = 1; i >= 0; --i)
 	{
 		initLightingInfo(vPosSurface, vLightPos[i], lightingInfo[i]);
-		color += lighting(vPosClip, vPosSurface, vec3(N), lightingInfo[i], 
-						vLightColor[i], vLightIntensity[i], surfColor);
+		color += lighting(vPosClip, vPosSurface, vec3(normal), lightingInfo[i], 
+						vLightColor[i], vLightIntensity[i], surfColor, vLightDir[i]);
 	}
 	#endif
 	rtFragColor = color;
