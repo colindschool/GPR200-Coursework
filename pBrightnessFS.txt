@@ -1,5 +1,20 @@
 #version 300 es
 
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: pBrightnessFS
+//	 Purpose: Darkens the dark part of the scene pass
+
 #ifdef GL_ES
 precision highp float;
 #endif // GL_ES
@@ -7,11 +22,14 @@ precision highp float;
 layout (location = 0) out vec4 rtFragColor;
 
 uniform sampler2D uTex;
-uniform vec2 uResolution;
 
 in vec2 vTexcoord;
-in vec4 vClipspace;
 
+// calcLuma: Gets the luma of a color that is input
+//		color:	input color to get the brightness of
+//	Source for the luma values comes from David Wolff's GLSL 4.0 Cookbook
+//		Link: https://people.inf.elte.hu/plisaai/pdf/David%20Wolff%20-%20OpenGL%204.0%20Shading%20Language%20Cookbook%20(2).pdf
+//			Page number 166 (179 in PDF)
 float calcLuma(vec4 color)
 {
 	return 0.21 * color.r + 0.72 * color.g + 0.07 * color.b;
@@ -19,14 +37,15 @@ float calcLuma(vec4 color)
 
 void main()
 {
-	vec4 ndc = vClipspace / vClipspace.w;
-	//vec2 uv = ndc.xy * 0.5 + 0.5;
+	// Get the texCoord from the VS
 	vec2 uv = vTexcoord.xy;
 	vec4 col = texture(uTex, uv);
+	// Calc luma
 	float luma = calcLuma(col);
+	
 	//col = col * (luma * luma * (3. - 2. * luma));
 	//col = vec4(luma * luma * (3. - 2. * luma));
+	col *= luma * luma * luma * luma;
 	
-	col *= luma * luma * luma;
 	rtFragColor = col;
 }

@@ -4,6 +4,21 @@
 precision highp float;
 #endif // GL_ES
 
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: pBlurFS
+//	 Purpose: Performs a gaussian blur on a 5x5 area.
+
 layout (location = 0) out vec4 rtFragColor;
 
 uniform sampler2D uTex;
@@ -11,12 +26,20 @@ uniform sampler2D uTex;
 in vec2 vTexcoord;
 in vec2 vInvResolution;
 
+// blur5x5: Blurs an area using a 5x5 kernal in one direction by sampling from pixel edges
+//		sampler2D tex:		the texture to sample from
+//		vec2 center:		the center (uv) from where the displacement will be calculated from
+//		vec2 texelSize:		the size of the texels
+//	Source for most of this code: Daniel Buckstein
 vec4 blur5x5(in sampler2D tex, in vec2 center, in vec2 texelSize)
 {
+	// Weight of this kernal for pixel edges is 1/8 
 	float weight = 0.125;
+	// Calculate the sampling locations in positive and negative directions
 	vec2 positive = vec2(center + 0.5 * texelSize);
 	vec2 negative = vec2(center - positive);
 	
+	// Get the texels +-0.5 from the center and +-1.5 from the center
 	vec4 color = 3.0 * (texture(tex, positive) + texture(tex, negative));
 	color + (texture(tex, positive += texelSize) + texture(tex, negative -= texelSize));
 	color *= weight;
@@ -25,9 +48,12 @@ vec4 blur5x5(in sampler2D tex, in vec2 center, in vec2 texelSize)
 
 void main()
 {
+	// Calculate the UV from the passed NDC
 	vec2 uv = vTexcoord * 0.5 + 0.5;
+	// Calculate the blur horizontally
 	vec4 col = blur5x5(uTex, uv, vec2(vInvResolution.x, 0.0));
+	// Add a vertical blur as well
 	col += blur5x5(uTex, uv, vec2(0.0, vInvResolution.y));
-	//col = texture(uTex, uv);
+
 	rtFragColor = col;
 }

@@ -1,20 +1,42 @@
 #version 300 es
 
+//   Copyright 2020 Colin Deane
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//	   		http://www.apache.org/licenses/LICENSE-2.0
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+//
+//	 File name: pSceneFS
+//	 Purpose: Output the scene pass as a solid color or a texture.
+//		Also allows the user to also choose if they want lighting or not
+//
+//	Sources used:
+//		Joao Paulo's Crystal Texture and Normal Map. Licensed under CC0
+//			Link: https://3dtextures.me/2020/07/01/crystal-004/
+
+// Choose between TEXTURE and SOLIDCOLOR
 #define TEXTURE
+// Comment out LIGHTING for no lighting
 #define LIGHTING
 
 #ifdef GL_ES
 precision highp float;
 #endif // GL_ES
 
+// Get varyings from the VS
 in vec4 vNormal;
 in vec4 vPosClip;
 in vec4 vPosSurface;
-in vec3 vLightPos[2];
-in vec4 vLightColor[2];
-in float vLightIntensity[2];
-
-in vec3 vLightDir[2];
+in vec3 vLightPos[2]; 			// Light position
+in vec4 vLightColor[2];			// Light color
+in float vLightIntensity[2];	// Light intensity
+in vec3 vLightDir[2];			// Light direction (a.k.a. normLight)
 
 layout (location = 0) out vec4 rtFragColor;
 
@@ -25,7 +47,6 @@ uniform sampler2D uTexNormalMap;
 //		vec3 distVec:		the distance vector between the light and the surface
 //		float distVecSq:	the distance squared between the light and the surface
 //		float lightDist:	the distance float between the light and the surface
-//		vec3 nLight:		the normalized light vector
 struct LightingInfo
 {
 	vec3 distVec;
@@ -33,6 +54,9 @@ struct LightingInfo
 	float lightDist;
 };
 
+// initLightingInfo: Helper function to initialized lighting info
+//		vec4 posSurface:		the position of the surface
+//		vec3 lightCenter:		the light center 
 void initLightingInfo(in vec4 posSurface, in vec3 lightCenter, out LightingInfo li)
 {
 	li.distVec = lightCenter - vec3(posSurface);
@@ -95,6 +119,7 @@ float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
 //		vec4 lightColor:		the color of the light
 //		float lightIntensity:	the intensity of the light
 //		vec4 surfColor:			the color of the surface
+//		vec3 lightDir:			the normalized direction of the light
 vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm, in LightingInfo li, in vec4 lightColor, in float lightIntensity,
 			  in vec4 surfColor, in vec3 lightDir)
 {
@@ -108,13 +133,17 @@ void main()
 {
 	vec4 color;
 
+	// Perform the perspective divide on the position in clip space to get the NDC
 	vec4 ndc = vPosClip / vPosClip.w;
-	
-	vec4 normal = texture(uTexNormalMap, ndc.xy);
+	// Convert the NDC to a UV
+	vec2 uv = ndc.xy * 0.5 + 0.5;
+	vec4 normal = vNormal;
 	LightingInfo lightingInfo[2];
 	
 	#ifdef TEXTURE
-	vec4 surfColor = texture(uTex, ndc.xy);
+	// Get the appropriate surface color and normal
+	vec4 surfColor = texture(uTex, uv);
+	normal = texture(uTexNormalMap, uv);
 	color = surfColor;
 	#endif
 	
@@ -127,6 +156,7 @@ void main()
 	color = vec4(0.0);
 	for(int i = 1; i >= 0; --i)
 	{
+		// Initialize the lighting info and then calculate lighting
 		initLightingInfo(vPosSurface, vLightPos[i], lightingInfo[i]);
 		color += lighting(vPosClip, vPosSurface, vec3(normal), lightingInfo[i], 
 						vLightColor[i], vLightIntensity[i], surfColor, vLightDir[i]);
