@@ -6,22 +6,16 @@ precision highp float;
 
 layout (location = 0) out vec4 rtFragColor;
 
-in vec2 vTexcoord;
-
-uniform vec2 uResolution;
 uniform sampler2D uTex;
+uniform sampler2D uTexOriginal;
+
+in vec2 vTexcoord;
 
 void main()
 {
-
-	// sampler, uv
-	// 1) uv = screen_location / sceen_resolution
-	// 2) 
-	//vec2 uv = gl_FragCoord.xy / uResolution;
-	vec2 uv = vTexcoord;
-	vec4 col = texture(uTex, uv);
-	
-	rtFragColor = vec4(1.0, 0.5, 0.0, 0.0);
-	rtFragColor = vec4(uv, 0.0, 1.0);
-	rtFragColor = col;
+	vec2 uv = vTexcoord * 0.5 + 0.5;
+	vec4 original = texture(uTexOriginal, uv);
+	vec4 blur = texture(uTex, uv);
+	rtFragColor = 1.0 - (1.0 - original) * (1.0 - blur);
+	rtFragColor = original + blur;
 }
