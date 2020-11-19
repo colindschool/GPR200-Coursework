@@ -8,10 +8,62 @@ uniform mat4 uModelMat, uViewMat, uProjMat;
 
 out vec4 vNormal;
 out vec2 vTexcoord;
+out vec4 vPosClip;
+out vec4 vPosSurface;
+out vec4 vLightPos[2];
+out vec4 vLightColor[2];
+out float vLightIntensity[2];
+
+// Structure for containing a pointlight
+struct PointLight
+{
+	vec4 center; 		// Location of the light source
+	vec4 color;			// Color of the light
+	float intensity;		// Intensity of the light
+};
+
+// initLight: Initializes a pointlight 
+//		vec4 center: 		the position of the light in world space
+//		mat4 viewMat:		the view matrix to convert the light from world to view space
+//		vec4 color: 		the color of the light
+//		float intensity:	the intensity of the light
+void initLight(in vec4 center, in mat4 viewMat, in vec4 color, in float intensity, 
+				out PointLight light)
+{
+	light.center = viewMat * center;
+	light.color = color;
+	light.intensity = intensity;
+}
 
 void main()
 {
-	gl_Position = uProjMat * uViewMat * uModelMat * aPosition;
-	vNormal = vec4(aNormal, 0.0);
+	// PERSPECTIVE PIPELINE
+	mat4 modelViewMat = uViewMat * uModelMat;
+	vec4 posCamera = modelViewMat * aPosition;
+	vec4 posSurface = posCamera;
+	vec4 posClip = uProjMat * posCamera;
+	gl_Position = posClip;
+	vPosClip = posClip;
+	vPosSurface = posSurface;
+	
+	// NORMAL PIPELINE
+	mat3 normalMatrix = transpose(inverse(mat3(modelViewMat)));
+	vNormal = vec4(normalMatrix * aNormal, 0.0);
+	
+	
+	// LIGHTING PIPELINE
+	PointLight light1, light2;
+	initLight(vec4(1.5, 0.5, 2.5, 1.0), uViewMat, vec4(1.0, 0.5, 0.0, 1.0), 100., light1);
+	initLight(vec4(-7., 1.0, 10.0, 1.0), uViewMat, vec4(1.0), 100., light2);
+	
+	vLightPos[0] = light1.center;
+	vLightPos[1] = light2.center;
+	
+	vLightColor[0] = light1.color;
+	vLightColor[1] = light2.color;
+	
+	vLightIntensity[0] = light1.intensity;
+	vLightIntensity[1] = light2.intensity;
+	
 	vTexcoord = aPosition.xy * 0.5 + 0.5;
 }

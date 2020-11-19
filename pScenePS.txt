@@ -1,17 +1,133 @@
 #version 300 es
 
+#define TEXTURE
+#define LIGHTING
+
 #ifdef GL_ES
 precision highp float;
 #endif // GL_ES
 
 in vec4 vNormal;
 in vec2 vTexcoord;
+in vec4 vPosClip;
+in vec4 vPosSurface;
+in vec4 vLightPos[2];
+in vec4 vLightColor[2];
+in float vLightIntensity[2];
 
 layout (location = 0) out vec4 rtFragColor;
 
 uniform sampler2D uTex;
 
+// Structure for containing lighting info.
+//		vec3 distVec:		the distance vector between the light and the surface
+//		float distVecSq:	the distance squared between the light and the surface
+//		float lightDist:	the distance float between the light and the surface
+//		vec3 nLight:		the normalized light vector
+struct LightingInfo
+{
+	vec3 distVec;
+	float distVecSq;
+	float lightDist;
+	vec3 nLight;
+};
+
+void initLightingInfo(in vec4 posSurface, in vec4 lightCenter, out LightingInfo li)
+{
+	li.distVec = vec3(lightCenter - posSurface);
+	li.distVecSq = dot(li.distVec, li.distVec);
+	li.lightDist = sqrt(li.distVecSq);
+	li.nLight = li.distVec / li.lightDist;
+}
+
+// attenuation: calculate attenuation for the light
+//		float lightDist:		the distance to the light from the surface
+//		float lightIntensity:	the intensity of the light
+float attenuation(in float lightDist, in float lightIntensity)
+{
+	// Calulate the distance / intensity for faster calculations
+	float distIntensity = lightDist / lightIntensity; 
+	return 1. /(1. + distIntensity + (distIntensity * distIntensity) );
+}
+
+// lambertian: calculate lambertian reflectance with attenuation
+//		vec3 nNorm:				the normalized normal of the surface
+//		vec3 nLight:			the normalized vector of the light
+//		float lightIntensity:	the intensity of the light
+//		float lightDist:		the distance to the light from the surface
+float lambertian(in vec3 nNorm, in vec3 nLight, in float lightIntensity, in float lightDist)
+{
+	// Calculate the diffuse coefficient
+	float kD = max(0., dot(nNorm, nLight));
+	// Calculate the attenuation
+	float atten = attenuation(lightDist, lightIntensity);
+	// return the diffuse intensity (diffuse coefficient * attenuation)
+	return kD * atten;
+}
+
+// phong: calculate phong reflectance
+//		vec4 posClip:		the object in clip space (used for the viewer vector)
+//		vec4 posSurface:	the position of the surface (view or object)
+//		vec3 nLight:		the normalized vector of the light
+//		vec3 nNorm:			the normalized normal of the surface
+float phong(in vec4 posClip, in vec4 posSurface, in vec3 nLight, in vec3 nNorm)
+{
+	// Get the normal view vector by subtracting the posSurface from the posClip
+	vec3 nViewVec = normalize(vec3(posClip - posSurface));
+	// Calculate the reflected light vector by taking the inverse of the light (pointing towards sphere))
+	vec3 nRefLightVec = reflect(-nLight, nNorm);
+	// Specular coefficient
+	float kS = max(0., dot(nRefLightVec, nViewVec));
+	// Get the specular intensity by squaring the specular coefficient a lot
+	float iS = kS * kS;
+	iS *= iS;
+	iS *= iS; 
+	iS *= iS;
+	iS *= iS;  
+	return iS;
+}
+
+// lighting: calculates the color after lighting the sceen
+//		vec4 posClip:			the object in clip space
+//		vec4 posSurface:		the position of the surface (view or object)
+//		vec3 nNorm:				the normalalized normal of the surface
+//		LightingInfo li:		the lighting info
+//		vec4 lightColor:		the color of the light
+//		float lightIntensity:	the intensity of the light
+//		vec4 surfColor:			the color of the surface
+vec4 lighting(in vec4 posClip, in vec4 posSurface, in vec3 nNorm, in LightingInfo li, in vec4 lightColor, in float lightIntensity,
+			  in vec4 surfColor)
+{
+
+	float iD = lambertian(nNorm, li.nLight, 100., li.lightDist);
+	float iS = phong(posClip, posSurface, li.nLight, nNorm);
+	return (iD * surfColor + iS * vec4(1.)) * lightColor;
+}
+
 void main()
 {
-	rtFragColor = texture(uTex, vTexcoord);
+	vec4 N = normalize(vNormal);
+	vec4 color;
+	
+	LightingInfo lightingInfo[2];
+	
+	#ifdef TEXTURE
+	vec4 surfColor = texture(uTex, vTexcoord);
+	color = surfColor;
+	#endif
+	#ifdef SOLIDCOLOR
+	vec4 surfColor = vec4(1.0, 0.5, 0.5, 1.0);
+	color = surfColor;
+	#endif
+	
+	#ifdef LIGHTING
+	color = vec4(0.0);
+	for(int i = 1; i >= 0; --i)
+	{
+		initLightingInfo(vPosSurface, vLightPos[i], lightingInfo[i]);
+		color += lighting(vPosClip, vPosSurface, vec3(N), lightingInfo[i], 
+						vLightColor[i], vLightIntensity[i], surfColor);
+	}
+	#endif
+	rtFragColor = color;
 }
